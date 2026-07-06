@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm off-white surface, deep indigo ink */
+    --background: 60 17% 98%;
+    --foreground: 230 55% 17%;
+    --card: 0 0% 100%;
+    --card-foreground: 230 55% 17%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 230 55% 17%;
+    /* One confident blue, reserved for primary actions + live data */
+    --primary: 223 89% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 227 36% 95%;
+    --secondary-foreground: 230 40% 30%;
+    --muted: 60 10% 95%;
+    --muted-foreground: 228 24% 47%;
+    --accent: 227 36% 95%;
+    --accent-foreground: 230 55% 17%;
+    /* Status only — never decorative */
+    --destructive: 0 62% 47%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-soft: 0 62% 95%;
+    --success: 152 65% 34%;
+    --success-foreground: 0 0% 100%;
+    --success-soft: 152 45% 94%;
+    --warning: 35 79% 44%;
+    --warning-foreground: 0 0% 100%;
+    --warning-soft: 38 70% 94%;
+    --border: 60 9% 90%;
+    --input: 60 9% 87%;
+    --ring: 223 89% 59%;
+    --radius: 10px;
+    /* Sidebar stays deep indigo in both modes — structure is constant */
+    --sidebar: 231 55% 17%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-muted: 228 32% 65%;
+    --sidebar-border: 230 40% 26%;
+    --sidebar-active: 230 45% 26%;
+    /* Chart series — indigo family + status colors, consistent everywhere */
+    --chart-1: 223 89% 59%;
+    --chart-2: 230 45% 45%;
+    --chart-3: 152 65% 40%;
+    --chart-4: 35 79% 50%;
+    --chart-5: 228 24% 65%;
+  }
+
+  .dark {
+    /* Deep blue-black, never pure black; same accent discipline */
+    --background: 229 38% 8%;
+    --foreground: 227 40% 92%;
+    --card: 228 34% 11%;
+    --card-foreground: 227 40% 92%;
+    --popover: 228 34% 12%;
+    --popover-foreground: 227 40% 92%;
+    --primary: 221 90% 66%;
+    --primary-foreground: 229 45% 10%;
+    --secondary: 229 30% 17%;
+    --secondary-foreground: 227 35% 85%;
+    --muted: 229 30% 15%;
+    --muted-foreground: 228 22% 64%;
+    --accent: 229 30% 17%;
+    --accent-foreground: 227 40% 92%;
+    --destructive: 0 66% 60%;
+    --destructive-foreground: 229 45% 10%;
+    --destructive-soft: 0 45% 18%;
+    --success: 152 55% 48%;
+    --success-foreground: 229 45% 10%;
+    --success-soft: 152 40% 14%;
+    --warning: 38 85% 58%;
+    --warning-foreground: 229 45% 10%;
+    --warning-soft: 38 50% 15%;
+    --border: 229 28% 19%;
+    --input: 229 28% 22%;
+    --ring: 221 90% 66%;
+    --sidebar: 230 42% 10%;
+    --sidebar-foreground: 227 40% 92%;
+    --sidebar-muted: 228 24% 60%;
+    --sidebar-border: 229 30% 17%;
+    --sidebar-active: 229 32% 19%;
+    --chart-1: 221 90% 66%;
+    --chart-2: 228 40% 60%;
+    --chart-3: 152 55% 52%;
+    --chart-4: 38 85% 60%;
+    --chart-5: 228 20% 45%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+@layer utilities {
+  .num {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  /* Restrained glass — overlays and modals only */
+  .glass {
+    background: hsl(var(--popover) / 0.86);
+    backdrop-filter: blur(12px) saturate(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  body {
+    background: white;
+  }
+  .print-hidden {
+    display: none !important;
+  }
+}
