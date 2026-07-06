@@ -10,6 +10,14 @@ import { ROLES } from "./types";
 
 const YEAR = 60 * 60 * 24 * 365;
 
+// Resolve the public origin for OAuth/redirect links. Prefers an explicit
+// NEXT_PUBLIC_SITE_URL, then the Vercel deployment URL, then localhost in dev.
+function siteUrl() {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+}
+
 // ---------------------------------------------------------------------------
 // Demo mode — role-based sign-in so RBAC is exercisable without real auth
 // ---------------------------------------------------------------------------
@@ -91,7 +99,7 @@ export async function signInWithGoogle(): Promise<{ error: string } | void> {
     return;
   }
   const supabase = supabaseServer();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const origin = siteUrl();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: `${origin}/auth/callback` },
@@ -107,7 +115,7 @@ export async function requestPasswordReset(
   const email = String(formData.get("email") ?? "");
   if (!usingSupabase) return { sent: true };
   const supabase = supabaseServer();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const origin = siteUrl();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/reset-password`,
   });
