@@ -35,16 +35,13 @@ function Kpi({
   const Icon = ICONS[icon];
   const toneCls = { default: "text-foreground", warning: "text-warning", danger: "text-destructive" }[tone];
   return (
-    <Card className={cn(
-      "p-5 transition-all duration-300 hover-lift card-glow hover:border-primary/25",
-      flash && "animate-liveFlash border-primary/40 shadow-sm"
-    )}>
+    <Card className={cn("p-5 transition-colors", flash && "animate-liveFlash")}>
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{label}</span>
+        <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</span>
         <Icon className="h-4 w-4 text-muted-foreground" />
       </div>
-      <div className={cn("num mt-2.5 font-sans text-3xl font-semibold tracking-tight", toneCls)}>{value}</div>
-      <div className="mt-1.5 text-xs text-muted-foreground">{sub}</div>
+      <div className={cn("num mt-2 font-sans text-3xl font-semibold tracking-tight", toneCls)}>{value}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{sub}</div>
     </Card>
   );
 }

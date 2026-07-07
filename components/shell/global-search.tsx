@@ -111,9 +111,9 @@ export function GlobalSearch() {
                     <Command.Item
                       key={item.href}
                       onSelect={() => go(item.href)}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary transition-all duration-150"
+                      className="flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm data-[selected=true]:bg-accent"
                     >
-                      <ArrowRight className="h-4 w-4 shrink-0 opacity-70" />
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       {item.title}
                     </Command.Item>
                   ))}
@@ -128,18 +128,18 @@ export function GlobalSearch() {
                         key={`${hit.type}-${hit.id}`}
                         value={`${hit.type}-${hit.id}`}
                         onSelect={() => go(hit.href)}
-                        className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary transition-all duration-150"
+                        className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm data-[selected=true]:bg-accent"
                       >
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground transition-colors group-hover:bg-primary/20">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary text-muted-foreground">
                           <Icon className="h-4 w-4" />
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">{hit.title}</span>
-                          <span className="block truncate text-xs text-muted-foreground/80 group-data-[selected=true]:text-primary/75">
+                          <span className="block truncate text-xs text-muted-foreground">
                             {hit.subtitle}
                           </span>
                         </span>
-                        <span className={cn("text-2xs capitalize text-muted-foreground/60")}>{hit.type}</span>
+                        <span className={cn("text-2xs capitalize text-muted-foreground")}>{hit.type}</span>
                       </Command.Item>
                     );
                   })}

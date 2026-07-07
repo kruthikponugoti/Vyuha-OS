@@ -30,12 +30,12 @@ export default function LandingPage() {
               <Sparkles className="h-3 w-3" />
               AI operating system for SMEs
             </Badge>
-            <h1 className="mt-5 font-display text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl bg-gradient-to-r from-foreground via-foreground/90 to-primary bg-clip-text text-transparent">
-              Run Sales. Manage HR. Track Finance. Automate Operations. Talk to AI.
+            <h1 className="mt-5 font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl">
+              Run your entire business by talking to AI
             </h1>
-            <p className="mt-5 max-w-lg text-lg leading-relaxed text-muted-foreground">
-              Vyuha OS replaces your disconnected CRM, ERP, inventory, HR, finance, and analytics tools with
-              one intelligent workspace. Type or speak a command — the Copilot handles the rest, against your real data.
+            <p className="mt-5 max-w-lg text-lg text-muted-foreground">
+              Vyuha OS replaces your CRM, ERP, inventory, HR, finance and analytics tools with one
+              AI-driven platform. Type or speak a command — it does the work, against your real data.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg">

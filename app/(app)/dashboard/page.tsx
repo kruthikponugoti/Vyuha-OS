@@ -95,7 +95,7 @@ export default async function DashboardPage() {
         )}
       </PageHeader>
 
-      <div className="space-y-6 md:space-y-8 p-6 md:p-8">
+      <div className="space-y-6 p-5 sm:p-8">
         {kpis.length > 0 && (
           <LiveKpis
             visible={kpis}
@@ -192,7 +192,7 @@ export default async function DashboardPage() {
                     <Link
                       key={a.label}
                       href={a.href}
-                      className="flex flex-col gap-2 rounded-card border border-border bg-background p-3.5 transition-all duration-300 hover-lift hover:border-primary/30 hover:bg-accent/40"
+                      className="flex flex-col gap-2 rounded-card border border-border bg-background p-3.5 transition-colors hover:border-primary/40 hover:bg-accent/50"
                     >
                       <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
                         <a.icon className="h-4 w-4" />
