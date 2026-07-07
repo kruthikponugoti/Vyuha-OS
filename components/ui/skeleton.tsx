@@ -6,7 +6,7 @@ function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>)
       className={cn("relative overflow-hidden rounded-md bg-muted", className)}
       {...props}
     >
-      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.6s_infinite] bg-gradient-to-r from-transparent via-foreground/[0.04] to-transparent" />
+      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.6s_infinite] bg-gradient-to-r from-transparent via-muted-foreground/[0.06] to-transparent" />
     </div>
   );
 }

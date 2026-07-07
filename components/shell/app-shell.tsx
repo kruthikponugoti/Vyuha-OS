@@ -41,11 +41,11 @@ export function AppShell({
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="absolute inset-0 bg-ink-950/50 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-ink-950/40 backdrop-blur-sm transition-all duration-300"
             onClick={() => setMobileOpen(false)}
             aria-hidden
           />
-          <aside className="absolute inset-y-0 left-0 w-64 shadow-overlay animate-in slide-in-from-left duration-200">
+          <aside className="absolute inset-y-0 left-0 w-64 shadow-overlay animate-in slide-in-from-left duration-300 ease-out bg-sidebar">
             <SidebarNav
               role={user.role}
               businessName={business.name}
@@ -55,7 +55,7 @@ export function AppShell({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="absolute right-2 top-4 text-white hover:bg-white/10"
+              className="absolute right-2 top-4 text-white hover:bg-white/10 transition-colors"
               onClick={() => setMobileOpen(false)}
               aria-label="Close menu"
             >
@@ -67,7 +67,7 @@ export function AppShell({
 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/85 px-4 backdrop-blur-md sm:px-6">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-lg sm:px-6">
           <Button
             variant="ghost"
             size="icon-sm"

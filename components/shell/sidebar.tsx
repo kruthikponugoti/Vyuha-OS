@@ -24,22 +24,22 @@ export function SidebarNav({
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex items-center gap-2.5 px-5 pb-6 pt-6">
+      <div className="flex items-center gap-2.5 px-5 pb-5 pt-5">
         <VyuhaMark className="h-6 w-6 text-primary" />
         <div>
           <div className="font-display text-base font-semibold leading-none tracking-tight">
             Vyuha OS
           </div>
-          <div className="mt-1 text-2xs uppercase tracking-[0.14em] text-sidebar-muted">
+          <div className="mt-1.5 text-2xs uppercase tracking-[0.14em] text-sidebar-muted">
             Business Copilot
           </div>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4" aria-label="Main">
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4" aria-label="Main">
         {groups.map((group) => (
           <div key={group.label}>
-            <div className="px-3 pb-1.5 text-2xs font-medium uppercase tracking-[0.12em] text-sidebar-muted">
+            <div className="px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.12em] text-sidebar-muted/80">
               {group.label}
             </div>
             <div className="space-y-0.5">
@@ -53,10 +53,10 @@ export function SidebarNav({
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
                       active
-                        ? "bg-sidebar-active text-white"
-                        : "text-sidebar-foreground/75 hover:bg-white/5 hover:text-white"
+                        ? "bg-sidebar-active text-white shadow-sm ring-1 ring-white/5"
+                        : "text-sidebar-foreground/70 hover:bg-white/5 hover:text-white"
                     )}
                   >
                     <NavIcon name={item.icon} className="h-[18px] w-[18px]" />
