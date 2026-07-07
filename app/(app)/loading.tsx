@@ -17,7 +17,7 @@ export default function AppLoading() {
             </div>
           ))}
         </div>
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Skeleton className="h-72 rounded-card lg:col-span-2" />
           <Skeleton className="h-72 rounded-card" />
         </div>

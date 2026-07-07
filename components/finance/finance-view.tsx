@@ -68,7 +68,7 @@ export function FinanceView({
 
   return (
     <Tabs defaultValue="overview" className="p-5 sm:p-8">
-      <TabsList className="flex-wrap">
+     <TabsList>
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="invoices">Invoices ({invoices.length})</TabsTrigger>
         <TabsTrigger value="expenses">Expenses ({expenses.length})</TabsTrigger>
@@ -79,13 +79,13 @@ export function FinanceView({
 
       {/* Overview */}
       <TabsContent value="overview" className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Revenue this month" value={inr(data.revenueThisMonth)} sub="payments received" />
           <StatCard label="Expenses this month" value={inr(data.expensesThisMonth)} />
           <StatCard label="Net profit" value={inr(data.netProfit)} tone={data.netProfit >= 0 ? "success" : "danger"} />
           <StatCard label="Outstanding" value={inr(data.outstanding)} tone={data.outstanding > 0 ? "warning" : "default"} sub={`${inr(data.overdueAmount)} overdue`} />
         </div>
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader><CardTitle>Cash flow</CardTitle><CardDescription>Inflow vs outflow, last 6 months</CardDescription></CardHeader>
             <CardContent>

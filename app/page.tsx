@@ -24,7 +24,7 @@ export default function LandingPage() {
               "radial-gradient(ellipse 60% 50% at 50% -10%, hsl(var(--primary) / 0.12), transparent)",
           }}
         />
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-2 lg:py-24">
+        <div className="mx-auto grid grid-cols-1 max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-2 lg:py-24">
           <div>
             <Badge variant="primary" className="gap-1.5">
               <Sparkles className="h-3 w-3" />

@@ -80,7 +80,7 @@ export function ProjectsView({
       </TabsContent>
 
       <TabsContent value="projects">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => {
             const pts = tasks.filter((t) => t.project_id === p.id);
             const done = pts.filter((t) => t.status === "done").length;

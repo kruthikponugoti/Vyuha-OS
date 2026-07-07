@@ -60,7 +60,7 @@ export function SettingsView({
 
   return (
     <Tabs defaultValue="business" className="p-5 sm:p-8">
-      <TabsList className="flex-wrap">
+     <TabsList>
         <TabsTrigger value="business">Business</TabsTrigger>
         <TabsTrigger value="profile">Profile</TabsTrigger>
         <TabsTrigger value="team">Team</TabsTrigger>
@@ -73,7 +73,7 @@ export function SettingsView({
       <TabsContent value="business">
         <Card className="max-w-2xl">
           <CardHeader><CardTitle>Business profile</CardTitle><CardDescription>How Vyuha OS formats money, dates and reports.</CardDescription></CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
+          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2"><Label className="mb-1.5 block">Business name</Label><Input value={biz.name} onChange={(e) => setBiz({ ...biz, name: e.target.value })} disabled={!canManage} /></div>
             <div>
               <Label className="mb-1.5 block">Industry</Label>
@@ -102,7 +102,7 @@ export function SettingsView({
                 <Badge variant="primary" className="mt-1 capitalize">{titleCase(user.role)}</Badge>
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div><Label className="mb-1.5 block">Full name</Label><Input defaultValue={user.name} /></div>
               <div><Label className="mb-1.5 block">Email</Label><Input defaultValue={user.email} disabled /></div>
             </div>

@@ -113,12 +113,12 @@ export function KbView({ files, canWrite }: { files: KnowledgeBaseFile[]; canWri
           {files.length === 0 ? (
             <EmptyState icon={<BookOpen className="h-5 w-5" />} title="No documents yet" description="Add policies, handbooks and guides so the Copilot can answer from them." className="border-0" />
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {files.map((f) => (
                 <div key={f.id} className="flex items-start gap-3 rounded-card border border-border bg-background p-4">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground"><FileText className="h-4.5 w-4.5" /></span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-sm font-medium">{f.name}</span>
                       <Badge variant={f.status === "ready" ? "success" : "warning"} className="shrink-0 capitalize">{f.status}</Badge>
                     </div>

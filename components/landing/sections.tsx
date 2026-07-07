@@ -39,7 +39,7 @@ export function FeaturesSection() {
         title="Eleven tools, replaced by one you can talk to"
         sub="Every module reads and writes the same database, and every one is reachable from the Copilot."
       />
-      <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {FEATURES.map(([Icon, title, desc], i) => (
           <Reveal key={title as string} delay={(i % 4) * 60}>
             <div className="group h-full rounded-card border border-border bg-card p-5 shadow-card transition-shadow hover:shadow-raise">
@@ -67,7 +67,7 @@ export function HowItWorksSection() {
     <section id="how" className="scroll-mt-20 border-y border-border bg-secondary/30 py-24">
       <div className="mx-auto max-w-6xl px-6">
         <SectionHeading eyebrow="How it works" title="Run operations in three moves" />
-        <div className="mt-14 grid gap-6 md:grid-cols-3">
+        <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
           {STEPS.map(([Icon, title, desc], i) => (
             <Reveal key={title as string} delay={i * 100}>
               <div className="relative rounded-card border border-border bg-card p-6 shadow-card">
@@ -130,7 +130,7 @@ export function TestimonialsSection() {
     <section className="border-y border-border bg-secondary/30 py-24">
       <div className="mx-auto max-w-6xl px-6">
         <SectionHeading eyebrow="Trusted by operators" title="Less admin, more business" />
-        <div className="mt-14 grid gap-5 md:grid-cols-3">
+        <div className="mt-14 grid grid-cols-1 gap-5 md:grid-cols-3">
           {TESTIMONIALS.map(([quote, name, role], i) => (
             <Reveal key={name} delay={i * 80}>
               <figure className="flex h-full flex-col rounded-card border border-border bg-card p-6 shadow-card">
@@ -179,7 +179,7 @@ export function PricingSection() {
         title="Simple pricing that scales with you"
         sub="Start free. Upgrade when Vyuha OS is running your day."
       />
-      <div className="mt-14 grid gap-5 md:grid-cols-3">
+      <div className="mt-14 grid grid-cols-1 gap-5 md:grid-cols-3">
         {PLANS.map((plan, i) => (
           <Reveal key={plan.name} delay={i * 80}>
             <div
@@ -279,7 +279,7 @@ const FOOTER = {
 export function Footer() {
   return (
     <footer className="border-t border-border bg-secondary/20">
-      <div className="mx-auto grid max-w-6xl gap-10 px-6 py-14 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+      <div className="mx-auto grid grid-cols-1 max-w-6xl gap-10 px-6 py-14 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div>
           <span className="inline-flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />

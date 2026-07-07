@@ -75,7 +75,7 @@ export default async function DashboardPage() {
         />
 
         {/* Charts + health */}
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <div>
@@ -103,7 +103,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* AI insights + quick actions */}
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader className="flex-row items-center gap-2 space-y-0">
               <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -156,7 +156,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Sales by category + low stock + activity */}
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Sales by category</CardTitle>

@@ -50,7 +50,7 @@ export default async function CustomerDetail({ params }: { params: { id: string 
         </Button>
       </PageHeader>
 
-      <div className="grid gap-6 p-5 sm:p-8 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 p-5 sm:p-8 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-1">
           <Card>
             <CardHeader><CardTitle>Contact</CardTitle></CardHeader>
@@ -86,7 +86,7 @@ export default async function CustomerDetail({ params }: { params: { id: string 
         </div>
 
         <div className="space-y-6 lg:col-span-2">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard label="Total spend" value={inr(customer.total_spend)} sub={`${custPayments.length} payments`} />
             <StatCard label="Orders" value={custOrders.length} sub="all time" />
             <StatCard label="Outstanding" value={inr(outstanding)} tone={outstanding > 0 ? "warning" : "default"} sub="unpaid invoices" />
