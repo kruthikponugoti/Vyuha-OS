@@ -46,10 +46,21 @@ function Kpi({
   );
 }
 
-export function LiveKpis({ initial }: { initial: Metrics }) {
+export type KpiKey = "revenue" | "orders" | "customers" | "outstanding";
+
+// `visible` selects which KPI cards render, so the dashboard can show only the
+// ones a role is allowed to see. Defaults to all four (unchanged behaviour).
+export function LiveKpis({
+  initial,
+  visible = ["revenue", "orders", "customers", "outstanding"],
+}: {
+  initial: Metrics;
+  visible?: KpiKey[];
+}) {
   const [m, setM] = React.useState(initial);
   const [flash, setFlash] = React.useState<Record<string, boolean>>({});
   const prev = React.useRef(initial);
+  const show = (k: KpiKey) => visible.includes(k);
 
   const load = React.useCallback(async () => {
     try {
@@ -90,19 +101,31 @@ export function LiveKpis({ initial }: { initial: Metrics }) {
     return () => clearInterval(t);
   }, [load]);
 
+  const count = visible.length;
+  const cols =
+    count >= 4 ? "sm:grid-cols-2 xl:grid-cols-4" : count === 3 ? "sm:grid-cols-3" : count === 2 ? "sm:grid-cols-2" : "sm:grid-cols-1";
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Kpi icon="TrendingUp" label="Revenue this month" value={inr(m.revenueThisMonth)} sub={`${inr(m.revenueToday)} collected today`} flash={!!flash.revenueThisMonth} />
-      <Kpi icon="ShoppingCart" label="Orders" value={String(m.ordersThisMonth)} sub={`${m.ordersToday} placed today`} flash={!!flash.ordersToday} />
-      <Kpi icon="Users" label="Customers" value={String(m.customerCount)} sub="Total in your book" flash={!!flash.customerCount} />
-      <Kpi
-        icon="ReceiptText"
-        label="Outstanding"
-        value={inr(m.outstanding)}
-        sub="Unpaid & overdue invoices"
-        flash={!!flash.outstanding}
-        tone={m.outstanding > 0 ? "warning" : "default"}
-      />
+    <div className={`grid grid-cols-1 gap-4 ${cols}`}>
+      {show("revenue") && (
+        <Kpi icon="TrendingUp" label="Revenue this month" value={inr(m.revenueThisMonth)} sub={`${inr(m.revenueToday)} collected today`} flash={!!flash.revenueThisMonth} />
+      )}
+      {show("orders") && (
+        <Kpi icon="ShoppingCart" label="Orders" value={String(m.ordersThisMonth)} sub={`${m.ordersToday} placed today`} flash={!!flash.ordersToday} />
+      )}
+      {show("customers") && (
+        <Kpi icon="Users" label="Customers" value={String(m.customerCount)} sub="Total in your book" flash={!!flash.customerCount} />
+      )}
+      {show("outstanding") && (
+        <Kpi
+          icon="ReceiptText"
+          label="Outstanding"
+          value={inr(m.outstanding)}
+          sub="Unpaid & overdue invoices"
+          flash={!!flash.outstanding}
+          tone={m.outstanding > 0 ? "warning" : "default"}
+        />
+      )}
     </div>
   );
 }

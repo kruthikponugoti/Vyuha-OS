@@ -26,6 +26,12 @@ export async function middleware(req: NextRequest) {
   const isAuthPage = AUTH_PAGES.some((p) => pathname === p);
   if (!isProtected && !isAuthPage) return NextResponse.next();
 
+  // Expose the current path to server components (the app layout reads this to
+  // enforce role-based module access — see app/(app)/layout.tsx).
+  const forward = new Headers(req.headers);
+  forward.set("x-pathname", pathname);
+  const nextWithPath = () => NextResponse.next({ request: { headers: forward } });
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const usingSupabase = Boolean(url && anonKey && url.startsWith("http"));
@@ -33,7 +39,7 @@ export async function middleware(req: NextRequest) {
   let authed = false;
 
   if (usingSupabase) {
-    const res = NextResponse.next({ request: req });
+    const res = NextResponse.next({ request: { headers: forward } });
     const supabase = createServerClient(url!, anonKey!, {
       cookies: {
         getAll: () => req.cookies.getAll(),
@@ -72,7 +78,7 @@ export async function middleware(req: NextRequest) {
     to.pathname = "/dashboard";
     return NextResponse.redirect(to);
   }
-  return NextResponse.next();
+  return nextWithPath();
 }
 
 export const config = {

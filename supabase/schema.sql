@@ -425,9 +425,9 @@ declare
     "payments":         ["owner","admin","finance"],
     "expenses":         ["owner","admin","finance"],
     "employees":        ["owner","admin","hr"],
-    "attendance":       ["owner","admin","hr","manager"],
+    "attendance":       ["owner","admin","hr"],
     "leave_requests":   ["owner","admin","hr","manager","employee","finance","sales"],
-    "payroll":          ["owner","admin","hr","finance"],
+    "payroll":          ["owner","admin","hr"],
     "projects":         ["owner","admin","manager"],
     "tasks":            ["owner","admin","manager","employee","sales","finance","hr"],
     "documents":        ["owner","admin","manager","finance","hr"],
@@ -435,7 +435,15 @@ declare
     "notifications":    ["owner","admin","manager","finance","sales","hr","employee"],
     "audit_logs":       ["owner","admin","manager","finance","sales","hr","employee"]
   }';
+  -- Read is member-wide by default. These tables hold sensitive HR/payroll data
+  -- (salaries), so their SELECT is restricted by role too — this is what backs
+  -- the FAQ promise that Finance cannot access HR/payroll, at the DB level.
+  read_roles jsonb := '{
+    "employees":        ["owner","admin","hr"],
+    "payroll":          ["owner","admin","hr"]
+  }';
   roles text[];
+  rroles text[];
 begin
   -- businesses: members read their own; only owner/admin update
   execute 'alter table businesses enable row level security';
@@ -452,9 +460,16 @@ begin
   for t in select jsonb_object_keys(write_roles) loop
     roles := array(select jsonb_array_elements_text(write_roles->t));
     execute format('alter table %I enable row level security', t);
-    execute format(
-      'create policy %I on %I for select using (business_id = app_business_id())',
-      t || '_read', t);
+    if read_roles ? t then
+      rroles := array(select jsonb_array_elements_text(read_roles->t));
+      execute format(
+        'create policy %I on %I for select using (business_id = app_business_id() and has_role(%L::text[]))',
+        t || '_read', t, rroles);
+    else
+      execute format(
+        'create policy %I on %I for select using (business_id = app_business_id())',
+        t || '_read', t);
+    end if;
     execute format(
       'create policy %I on %I for insert with check (business_id = app_business_id() and has_role(%L::text[]))',
       t || '_insert', t, roles);
