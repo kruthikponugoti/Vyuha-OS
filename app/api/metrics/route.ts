@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { getDashboardData } from "@/lib/queries/dashboard";
-import { usingSupabase } from "@/lib/db";
+import { realMode } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +18,6 @@ export async function GET() {
     inventoryValue: data.inventoryValue,
     lowStock: data.lowStock,
     healthScore: data.healthScore,
-    realtime: usingSupabase,
+    realtime: realMode(),
   });
 }

@@ -20,6 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=oauth`);
   }
 
+  let dest = next;
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -29,8 +30,11 @@ export async function GET(request: Request) {
       .select("id")
       .eq("auth_id", user.id)
       .maybeSingle();
-    if (!profile) return NextResponse.redirect(`${origin}/onboarding`);
+    if (!profile) dest = "/onboarding";
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  // Real sign-in wins over any lingering demo session.
+  const res = NextResponse.redirect(`${origin}${dest}`);
+  res.cookies.delete("vyuha-demo-auth");
+  return res;
 }

@@ -33,7 +33,8 @@ export async function middleware(req: NextRequest) {
   const nextWithPath = () => NextResponse.next({ request: { headers: forward } });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   const usingSupabase = Boolean(url && anonKey && url.startsWith("http"));
 
   let authed = false;

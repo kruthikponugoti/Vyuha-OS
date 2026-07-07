@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { usingSupabase, getDb, DEMO_BUSINESS_ID } from "./db";
+import { usingSupabase, isDemoRequest, getDb, DEMO_BUSINESS_ID } from "./db";
 import { supabaseServer, DEMO_AUTH_COOKIE, DEMO_ROLE_COOKIE } from "./auth";
 import type { Role } from "./types";
 import { ROLES } from "./types";
@@ -36,10 +36,11 @@ export async function switchDemoRole(role: Role) {
 }
 
 export async function signOut() {
-  if (usingSupabase) {
-    await supabaseServer().auth.signOut();
-  } else {
+  // Demo session → drop the demo cookie. Real session → sign out of Supabase.
+  if (isDemoRequest()) {
     cookies().delete(DEMO_AUTH_COOKIE);
+  } else {
+    await supabaseServer().auth.signOut();
   }
   redirect("/login");
 }
@@ -64,6 +65,7 @@ export async function signInWithPassword(
   const supabase = supabaseServer();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: error.message };
+  cookies().delete(DEMO_AUTH_COOKIE); // leave any demo session behind
   redirect("/dashboard");
 }
 
@@ -88,6 +90,7 @@ export async function signUp(
     options: { data: { full_name: name } },
   });
   if (error) return { error: error.message };
+  cookies().delete(DEMO_AUTH_COOKIE); // leave any demo session behind
   // If email confirmation is on, session is null until verified.
   if (!data.session) redirect("/verify-email");
   redirect("/onboarding");
@@ -173,7 +176,7 @@ export async function inviteTeamMember(email: string, role: Role) {
   // Real mode: create a pending user row scoped to the inviter's business.
   // (Email delivery would use a server-side service-role client or an edge
   // function; that piece is not wired without keys.)
-  if (!usingSupabase) return { ok: true, demo: true };
+  if (isDemoRequest()) return { ok: true, demo: true };
   const db = getDb();
   const { error } = await db.from("users").insert({
     auth_id: null,

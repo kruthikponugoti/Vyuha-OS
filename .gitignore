@@ -7,3 +7,6 @@ npm-debug.log*
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Vercel local project link
+.vercel

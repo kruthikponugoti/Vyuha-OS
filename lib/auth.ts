@@ -7,7 +7,7 @@
 
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { getDb, usingSupabase, DEMO_BUSINESS_ID } from "./db";
+import { getDb, isDemoRequest, DEMO_BUSINESS_ID, DEMO_AUTH_COOKIE, DEMO_ROLE_COOKIE } from "./db";
 import type { Business, Role, User } from "./types";
 import { ROLES } from "./types";
 
@@ -17,14 +17,14 @@ export interface Session {
   demo: boolean;
 }
 
-export const DEMO_ROLE_COOKIE = "vyuha-demo-role";
-export const DEMO_AUTH_COOKIE = "vyuha-demo-auth";
+// Re-exported for callers that imported them from here historically.
+export { DEMO_AUTH_COOKIE, DEMO_ROLE_COOKIE };
 
 export function supabaseServer() {
   const store = cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)!,
     {
       cookies: {
         getAll: () => store.getAll(),
@@ -43,9 +43,9 @@ export function supabaseServer() {
 export async function getSession(): Promise<Session | null> {
   const db = getDb();
 
-  if (!usingSupabase) {
-    // Demo mode is "signed out" until the demo login sets this cookie, so the
-    // auth + onboarding flows are demonstrable without real Supabase.
+  if (isDemoRequest()) {
+    // Demo session: driven by the role-picker cookies. Works whether or not a
+    // real Supabase project is configured (hybrid mode).
     if (!cookies().get(DEMO_AUTH_COOKIE)) return null;
     const roleCookie = cookies().get(DEMO_ROLE_COOKIE)?.value as Role | undefined;
     const role: Role = roleCookie && ROLES.includes(roleCookie) ? roleCookie : "owner";
