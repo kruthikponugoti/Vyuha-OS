@@ -58,7 +58,7 @@ export function DocumentsView({
     <div className="space-y-6 p-5 sm:p-8">
       <Card>
         <CardHeader><CardTitle>Generate a document</CardTitle><CardDescription>Produce a polished PDF from your live data.</CardDescription></CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {GENERATORS.map((g) => (
             <button key={g.label} onClick={g.action} className="flex items-start gap-3 rounded-card border border-border bg-background p-4 text-left transition-colors hover:border-primary/40">
               <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary"><g.icon className="h-4.5 w-4.5" /></span>

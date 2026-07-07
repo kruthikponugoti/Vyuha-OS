@@ -86,7 +86,7 @@ export function HrView({
 
   return (
     <Tabs defaultValue="employees" className="p-5 sm:p-8">
-      <TabsList className="flex-wrap">
+     <TabsList>
         <TabsTrigger value="employees">Employees ({employees.length})</TabsTrigger>
         <TabsTrigger value="attendance">Attendance</TabsTrigger>
         <TabsTrigger value="leave">Leave{pendingLeave.length > 0 ? ` (${pendingLeave.length})` : ""}</TabsTrigger>
@@ -94,7 +94,7 @@ export function HrView({
       </TabsList>
 
       <TabsContent value="employees">
-        <div className="mb-4 grid gap-4 sm:grid-cols-3">
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard label="Headcount" value={employees.filter((e) => e.status !== "exited").length} sub="active employees" />
           <StatCard label="Departments" value={departments.length} />
           <StatCard label="Monthly payroll" value={inr(employees.filter((e) => e.status !== "exited").reduce((s, e) => s + e.salary, 0))} />

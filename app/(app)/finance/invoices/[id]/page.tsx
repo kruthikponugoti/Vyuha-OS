@@ -71,7 +71,7 @@ export default async function InvoiceDetail({ params }: { params: { id: string }
       </div>
 
       <div className="mx-auto max-w-3xl p-5 sm:p-8">
-        <div className="rounded-card border border-border bg-card p-8 shadow-card print:border-0 print:shadow-none sm:p-10">
+        <div className="rounded-card border border-border bg-card p-5 shadow-card print:border-0 print:shadow-none sm:p-10">
           <div className="flex items-start justify-between border-b border-border pb-8">
             <div>
               <div className="flex items-center gap-2">

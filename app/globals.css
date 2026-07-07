@@ -125,6 +125,14 @@
     background: hsl(var(--popover) / 0.86);
     backdrop-filter: blur(12px) saturate(1.1);
   }
+  /* Hide scrollbars on horizontally-scrollable strips (tab bars, chip rows) */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

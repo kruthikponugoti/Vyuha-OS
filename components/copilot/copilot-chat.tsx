@@ -128,7 +128,7 @@ export function CopilotChat() {
                 Ask about your business or tell me what to do — I'll act on your real data and show
                 you exactly what changed.
               </p>
-              <div className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-2">
+              <div className="mt-8 grid grid-cols-1 w-full max-w-xl gap-2 sm:grid-cols-2">
                 {SUGGESTIONS.map((s) => (
                   <button
                     key={s}

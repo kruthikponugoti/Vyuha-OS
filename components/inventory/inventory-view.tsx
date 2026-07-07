@@ -84,7 +84,7 @@ export function InventoryView({
 
   return (
     <Tabs defaultValue="products" className="p-5 sm:p-8">
-      <TabsList className="flex-wrap">
+     <TabsList>
         <TabsTrigger value="products">Products ({products.length})</TabsTrigger>
         <TabsTrigger value="forecast">Forecast{lowCount > 0 ? ` (${lowCount})` : ""}</TabsTrigger>
         <TabsTrigger value="suppliers">Suppliers ({suppliers.length})</TabsTrigger>

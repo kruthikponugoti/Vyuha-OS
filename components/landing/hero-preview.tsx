@@ -53,7 +53,7 @@ export function HeroPreview() {
           <span className="ml-3 text-xs text-muted-foreground">Vyuha OS · Copilot</span>
         </div>
 
-        <div className="grid gap-4 p-5 sm:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-5">
           {/* Copilot conversation */}
           <div className="sm:col-span-3">
             <div className="flex justify-end">

@@ -17,7 +17,7 @@ export function AnalyticsView({ data }: { data: AnalyticsData }) {
   return (
     <div className="p-5 sm:p-8">
       <Tabs defaultValue="sales">
-        <TabsList className="flex-wrap">
+       <TabsList>
           <TabsTrigger value="sales">Sales</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="customers">Customers</TabsTrigger>
@@ -26,12 +26,12 @@ export function AnalyticsView({ data }: { data: AnalyticsData }) {
         </TabsList>
 
         <TabsContent value="sales" className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard label="Avg order value" value={inr(data.aov)} />
             <StatCard label="Repeat rate" value={`${data.repeatRate}%`} sub="customers with 2+ orders" />
             <StatCard label="Top category" value={data.salesByCategory[0]?.name ?? "—"} sub={data.salesByCategory[0] ? inr(data.salesByCategory[0].value) : ""} />
           </div>
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader><CardTitle>Orders per month</CardTitle><CardDescription>Last 6 months</CardDescription></CardHeader>
               <CardContent><SimpleBarChart data={data.ordersSeries} dataKey="orders" labelKey="month" color={1} /></CardContent>
@@ -51,7 +51,7 @@ export function AnalyticsView({ data }: { data: AnalyticsData }) {
         </TabsContent>
 
         <TabsContent value="customers" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader><CardTitle>Top customers</CardTitle><CardDescription>By total spend</CardDescription></CardHeader>
               <CardContent><SimpleBarChart data={data.topCustomers} dataKey="value" labelKey="name" money color={0} /></CardContent>
@@ -84,7 +84,7 @@ export function AnalyticsView({ data }: { data: AnalyticsData }) {
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary"><Sparkles className="h-4 w-4" /></span>
           <div><CardTitle>AI recommendations</CardTitle><CardDescription>Actions suggested from your data</CardDescription></div>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {data.recommendations.map((r, i) => {
             const Icon = REC_ICON[r.tone];
             return (
