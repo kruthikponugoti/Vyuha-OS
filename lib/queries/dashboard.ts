@@ -211,6 +211,35 @@ export async function getDashboardData(businessId: string): Promise<DashboardDat
   };
 }
 
+export interface MyTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  due_date: string | null;
+  project: string;
+}
+
+// Tasks assigned to a specific user — for the Employee personal dashboard view.
+export async function getMyTasks(businessId: string, userId: string | null): Promise<MyTask[]> {
+  if (!userId) return [];
+  const [tasks, projects] = await Promise.all([all("tasks", businessId), all("projects", businessId)]);
+  const projName = new Map(projects.map((p) => [p.id, p.name]));
+  const rank: Record<string, number> = { todo: 0, in_progress: 1, review: 2, done: 3 };
+  return tasks
+    .filter((t) => t.assignee_id === userId)
+    .sort((a, b) => (rank[a.status] ?? 0) - (rank[b.status] ?? 0))
+    .slice(0, 8)
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      due_date: t.due_date,
+      project: projName.get(t.project_id) ?? "",
+    }));
+}
+
 export interface ActivityItem {
   id: string;
   icon: string;
