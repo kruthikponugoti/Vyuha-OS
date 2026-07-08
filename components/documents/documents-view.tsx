@@ -9,6 +9,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { generateReportPdf } from "@/lib/report-pdf";
 import { inr, formatDate, titleCase } from "@/lib/utils";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { FileText, FileSpreadsheet, FileSignature, Download, Search, ScrollText } from "lucide-react";
 import type { DocumentRow } from "@/lib/types";
 
@@ -27,6 +28,7 @@ export function DocumentsView({
     outstanding: number; new_customers: number; total_customers: number; low_stock_count: number;
   };
 }) {
+  const router = useRouter();
   const [query, setQuery] = React.useState("");
   const filtered = documents.filter((d) => d.name.toLowerCase().includes(query.toLowerCase()));
 
@@ -51,8 +53,9 @@ export function DocumentsView({
   }
 
   const GENERATORS = [
-    { label: "Monthly business report", desc: "Revenue, profit, receivables and more", icon: ScrollText, action: downloadReport },
+    { label: "Monthly business report", desc: "Interactive monthly dashboard with self-check verification & PDF export", icon: ScrollText, action: () => router.push("/documents/reports") },
   ];
+
 
   return (
     <div className="space-y-6 p-5 sm:p-8">

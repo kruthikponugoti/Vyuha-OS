@@ -1,4 +1,5 @@
-import { all, monthsAgo, monthKey, sum } from "@/lib/data";
+import { all, byId, monthsAgo, monthKey, sum } from "@/lib/data";
+import { formatMoney } from "@/lib/utils";
 import type { Payment, Order, OrderItem, Product, Customer, Category, Invoice } from "@/lib/types";
 
 export interface AnalyticsData {
@@ -20,7 +21,7 @@ const LABEL = (key: string) => {
 };
 
 export async function getAnalyticsData(businessId: string): Promise<AnalyticsData> {
-  const [payments, orders, orderItems, products, customers, categories, invoices] = await Promise.all([
+  const [payments, orders, orderItems, products, customers, categories, invoices, business] = await Promise.all([
     all("payments", businessId),
     all("orders", businessId),
     all("order_items", businessId),
@@ -28,7 +29,9 @@ export async function getAnalyticsData(businessId: string): Promise<AnalyticsDat
     all("customers", businessId),
     all("categories", businessId),
     all("invoices", businessId),
+    byId("businesses", businessId, businessId),
   ]);
+  const currency = business?.currency ?? "INR";
 
   // 6-month series
   const revByMonth: Record<string, number> = {};
@@ -87,7 +90,7 @@ export async function getAnalyticsData(businessId: string): Promise<AnalyticsDat
   // recommendations
   const recommendations: AnalyticsData["recommendations"] = [];
   const lowStock = products.filter((p: Product) => p.stock_qty <= p.low_stock_threshold);
-  if (topProducts[0]) recommendations.push({ tone: "good", title: "Double down on your bestseller", text: `${topProducts[0].name} drives the most revenue (₹${topProducts[0].revenue.toLocaleString("en-IN")}). Keep it well stocked and feature it prominently.` });
+  if (topProducts[0]) recommendations.push({ tone: "good", title: "Double down on your bestseller", text: `${topProducts[0].name} drives the most revenue (${formatMoney(topProducts[0].revenue, currency)}). Keep it well stocked and feature it prominently.` });
   if (lowStock.length) recommendations.push({ tone: "alert", title: "Restock before you lose sales", text: `${lowStock.length} products are below reorder level. Raising purchase orders now avoids stockouts on fast movers.` });
   if (repeatRate < 40) recommendations.push({ tone: "watch", title: "Grow repeat business", text: `Only ${repeatRate}% of customers have ordered more than once. A follow-up or loyalty nudge could lift repeat rate.` });
   const overdue = invoices.filter((i: Invoice) => i.status === "overdue");

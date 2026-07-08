@@ -1,6 +1,7 @@
 // Dashboard metrics — every number computed from real rows, nothing hardcoded.
 
-import { all, startOfToday, startOfMonth, monthsAgo, monthKey, sum, isSameDay } from "@/lib/data";
+import { all, byId, monthKey, sum, formatDateTz, formatMonthTz, prevMonthKeyTz } from "@/lib/data";
+import { formatMoney } from "@/lib/utils";
 import type {
   Invoice, Payment, Order, Product, Customer, Expense, Category,
 } from "@/lib/types";
@@ -32,8 +33,8 @@ const MONTH_LABEL = (key: string) => {
   return new Date(y, m - 1, 1).toLocaleDateString("en-IN", { month: "short" });
 };
 
-export async function getDashboardData(businessId: string): Promise<DashboardData> {
-  const [invoices, payments, orders, products, customers, expenses, categories, orderItems] =
+export async function getDashboardData(businessId: string, tz: string = "Asia/Kolkata"): Promise<DashboardData> {
+  const [invoices, payments, orders, products, customers, expenses, categories, orderItems, business] =
     await Promise.all([
       all("invoices", businessId),
       all("payments", businessId),
@@ -43,33 +44,34 @@ export async function getDashboardData(businessId: string): Promise<DashboardDat
       all("expenses", businessId),
       all("categories", businessId),
       all("order_items", businessId),
+      byId("businesses", businessId, businessId),
     ]);
 
-  const today = startOfToday();
-  const monthStart = startOfMonth();
-  const prevMonthStart = monthsAgo(1);
+  const currency = business?.currency ?? "INR";
+
+  const todayStr = formatDateTz(new Date(), tz);
+  const thisMonthStr = formatMonthTz(new Date(), tz);
+  const prevMonthStr = prevMonthKeyTz(tz);
 
   // Revenue = payments received
   const revenueThisMonth = sum(
-    payments.filter((p: Payment) => new Date(p.paid_at) >= monthStart),
+    payments.filter((p: Payment) => formatDateTz(p.paid_at, tz).startsWith(thisMonthStr)),
     (p) => p.amount
   );
   const revenueToday = sum(
-    payments.filter((p: Payment) => isSameDay(p.paid_at, today)),
+    payments.filter((p: Payment) => formatDateTz(p.paid_at, tz) === todayStr),
     (p) => p.amount
   );
   const revenuePrevMonth = sum(
-    payments.filter(
-      (p: Payment) => new Date(p.paid_at) >= prevMonthStart && new Date(p.paid_at) < monthStart
-    ),
+    payments.filter((p: Payment) => formatDateTz(p.paid_at, tz).startsWith(prevMonthStr)),
     (p) => p.amount
   );
 
-  const ordersToday = orders.filter((o: Order) => isSameDay(o.created_at, today)).length;
-  const ordersThisMonth = orders.filter((o: Order) => new Date(o.created_at) >= monthStart).length;
+  const ordersToday = orders.filter((o: Order) => formatDateTz(o.created_at, tz) === todayStr).length;
+  const ordersThisMonth = orders.filter((o: Order) => formatDateTz(o.created_at, tz).startsWith(thisMonthStr)).length;
 
   const newCustomersThisMonth = customers.filter(
-    (c: Customer) => new Date(c.created_at) >= monthStart
+    (c: Customer) => formatDateTz(c.created_at, tz).startsWith(thisMonthStr)
   ).length;
 
   const inventoryValue = sum(products, (p: Product) => p.cost * p.stock_qty);
@@ -85,23 +87,25 @@ export async function getDashboardData(businessId: string): Promise<DashboardDat
   const overdueCount = invoices.filter((i: Invoice) => i.status === "overdue").length;
 
   const expensesThisMonth = sum(
-    expenses.filter((e: Expense) => new Date(e.date) >= monthStart),
+    expenses.filter((e: Expense) => formatDateTz(e.date, tz).startsWith(thisMonthStr)),
     (e) => e.amount
   );
   const cashFlow = revenueThisMonth - expensesThisMonth;
 
   // 6-month revenue vs expenses series
   const series: Record<string, { revenue: number; expenses: number }> = {};
+  const now = new Date();
   for (let i = 5; i >= 0; i--) {
-    const key = monthKey(monthsAgo(i));
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = formatMonthTz(d, tz);
     series[key] = { revenue: 0, expenses: 0 };
   }
   for (const p of payments as Payment[]) {
-    const key = monthKey(p.paid_at);
+    const key = formatMonthTz(p.paid_at, tz);
     if (series[key]) series[key].revenue += p.amount;
   }
   for (const e of expenses as Expense[]) {
-    const key = monthKey(e.date);
+    const key = formatMonthTz(e.date, tz);
     if (series[key]) series[key].expenses += e.amount;
   }
   const revenueSeries = Object.entries(series).map(([month, v]) => ({
@@ -166,8 +170,9 @@ export async function getDashboardData(businessId: string): Promise<DashboardDat
   if (overdueCount > 0) {
     insights.push({
       tone: "watch",
-      text: `${overdueCount} invoice${overdueCount > 1 ? "s are" : " is"} overdue, worth ₹${outstanding.toLocaleString(
-        "en-IN"
+      text: `${overdueCount} invoice${overdueCount > 1 ? "s are" : " is"} overdue, worth ${formatMoney(
+        outstanding,
+        currency
       )} in total. Sending reminders could speed up cash flow.`,
     });
   }
@@ -184,7 +189,7 @@ export async function getDashboardData(businessId: string): Promise<DashboardDat
   if (cashFlow > 0) {
     insights.push({
       tone: "good",
-      text: `You're cash-flow positive this month by ₹${cashFlow.toLocaleString("en-IN")} after expenses.`,
+      text: `You're cash-flow positive this month by ${formatMoney(cashFlow, currency)} after expenses.`,
     });
   }
 

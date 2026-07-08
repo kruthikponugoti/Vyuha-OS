@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/shell/page-header";
 import { LiveKpis, type KpiKey } from "@/components/dashboard/live-kpis";
 import { HealthRing } from "@/components/dashboard/health-ring";
 import { DeniedToast } from "@/components/dashboard/denied-toast";
+import { SetupChecklist } from "@/components/dashboard/setup-checklist";
 import { RevenueAreaChart, DonutChart } from "@/components/charts/charts";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +52,7 @@ export default async function DashboardPage() {
   // dashboards stay unchanged). Only shows if their account links to an employee.
   const isStaff = ["manager", "finance", "sales", "hr", "employee"].includes(role);
   const [data, activity, myTasks, myAtt] = await Promise.all([
-    getDashboardData(session.business.id),
+    getDashboardData(session.business.id, session.business.timezone),
     show("activity") ? getRecentActivity(session.business.id) : Promise.resolve([]),
     show("my_tasks") ? getMyTasks(session.business.id, session.user.id) : Promise.resolve([]),
     isStaff ? myAttendance(session.business.id, session.user.id) : Promise.resolve({ linked: false as const }),
@@ -102,9 +103,17 @@ export default async function DashboardPage() {
       </PageHeader>
 
       <div className="space-y-6 p-5 sm:p-8">
+        <SetupChecklist 
+          customerCount={data.customerCount}
+          inventoryValue={data.inventoryValue}
+          invoiceCount={data.ordersThisMonth}
+          isOwnerOrAdmin={["owner", "admin"].includes(role)}
+        />
+
         {kpis.length > 0 && (
           <LiveKpis
             visible={kpis}
+            currency={session.business.currency}
             initial={{
               revenueThisMonth: data.revenueThisMonth,
               revenueToday: data.revenueToday,

@@ -12,7 +12,8 @@ import {
 } from "@/lib/queries/copilot-data";
 import { getHelp } from "@/lib/copilot/help";
 import { canUseTool, TOOL_MODULE, MODULE_LABELS, type ModuleKey } from "@/lib/permissions";
-import { inr, titleCase } from "@/lib/utils";
+import { formatMoney, titleCase } from "@/lib/utils";
+import { byId } from "@/lib/data";
 
 export interface ToolContext {
   actor: Actor;
@@ -122,12 +123,17 @@ export async function runTool(name: string, args: any, ctx: ToolContext): Promis
   // Backstop: the Copilot must never be a way around the UI/RLS. Even if a tool
   // slipped into the model's options, refuse here if the role can't use it.
   if (!canUseTool(actor.role, name)) return refusalFor(actor.role, name);
+  
+  const business = await byId("businesses", bid, bid);
+  const currency = business?.currency ?? "INR";
+  const money = (n: number) => formatMoney(n, currency);
+
   try {
     switch (name) {
       case "get_revenue": {
         const r = await getRevenue(bid, (args.period as Period) || "month");
         const label = r.period === "today" ? "Today" : `This ${r.period}`;
-        return { ok: true, summary: r.payment_count === 0 ? `${label} there's no revenue recorded yet.` : `${label} you've collected ${inr(r.total_revenue)} across ${r.payment_count} payment${r.payment_count === 1 ? "" : "s"}.`, data: r };
+        return { ok: true, summary: r.payment_count === 0 ? `${label} there's no revenue recorded yet.` : `${label} you've collected ${money(r.total_revenue)} across ${r.payment_count} payment${r.payment_count === 1 ? "" : "s"}.`, data: r };
       }
       case "get_business_health": {
         const d = await getDashboardData(bid);
@@ -155,29 +161,29 @@ export async function runTool(name: string, args: any, ctx: ToolContext): Promis
       case "create_quotation": {
         const type = name === "create_quotation" ? "quotation" : "invoice";
         const r = await svc.createInvoiceDoc(actor, { customer_name: args.customer_name, items: args.items, type });
-        return { ok: true, summary: `${type === "quotation" ? "Quotation" : "Invoice"} ${r.invoice.number} created for ${r.customer.name} — ${inr(r.invoice.total)}.`, data: { line_items: r.line_items, total: r.invoice.total, number: r.invoice.number }, invoice_id: r.invoice.id };
+        return { ok: true, summary: `${type === "quotation" ? "Quotation" : "Invoice"} ${r.invoice.number} created for ${r.customer.name} — ${money(r.invoice.total)}.`, data: { line_items: r.line_items, total: r.invoice.total, number: r.invoice.number }, invoice_id: r.invoice.id };
       }
       case "record_payment": {
         const r = await svc.recordPayment(actor, { invoiceRef: args.invoice_ref, amount: args.amount != null ? Number(args.amount) : undefined });
-        return { ok: true, summary: `Recorded ${inr(r.amount)} against ${r.invoice.number}${r.fullyPaid ? " — now fully paid." : ` — ${inr(r.invoice.total - r.invoice.amount_paid)} still due.`}`, data: r };
+        return { ok: true, summary: `Recorded ${money(r.amount)} against ${r.invoice.number}${r.fullyPaid ? " — now fully paid." : ` — ${money(r.invoice.total - r.invoice.amount_paid)} still due.`}`, data: r };
       }
       case "send_payment_reminder": {
         const r = await svc.sendPaymentReminder(actor, args.customer_name);
         if (!r.unpaid.length) return { ok: true, summary: `${r.customer.name} has no unpaid invoices — nothing to remind about.`, data: r };
-        return { ok: true, summary: `Drafted a reminder to ${r.customer.name} for ${inr(r.dueTotal)} across ${r.unpaid.length} invoice${r.unpaid.length === 1 ? "" : "s"}.`, data: { notification_draft: r.drafted, dueTotal: r.dueTotal } };
+        return { ok: true, summary: `Drafted a reminder to ${r.customer.name} for ${money(r.dueTotal)} across ${r.unpaid.length} invoice${r.unpaid.length === 1 ? "" : "s"}.`, data: { notification_draft: r.drafted, dueTotal: r.dueTotal } };
       }
       case "create_order": {
         const r = await svc.createOrderWorkflow(actor, { customer_name: args.customer_name, items: args.items });
-        return { ok: true, summary: `Order recorded for ${r.customer.name} — ${inr(r.total)}. Stock updated, invoice ${r.invoice.number} ready, customer message drafted for your review.`, data: { line_items: r.line_items, total: r.total, notification_draft: r.notification_draft }, trace: r.steps, invoice_id: r.invoice.id };
+        return { ok: true, summary: `Order recorded for ${r.customer.name} — ${money(r.total)}. Stock updated, invoice ${r.invoice.number} ready, customer message drafted for your review.`, data: { line_items: r.line_items, total: r.total, notification_draft: r.notification_draft }, trace: r.steps, invoice_id: r.invoice.id };
       }
       case "analyze_sales": {
         const r = await analyzeSales(bid, (args.period as Period) || "month");
         const top = r.top_products[0];
-        return { ok: true, summary: r.order_count === 0 ? `No sales in this ${r.period} yet.` : `This ${r.period}: ${r.order_count} orders worth ${inr(r.order_value)}, average ${inr(r.avg_order_value)}.${top ? ` Top seller: ${top.name}.` : ""}`, data: r };
+        return { ok: true, summary: r.order_count === 0 ? `No sales in this ${r.period} yet.` : `This ${r.period}: ${r.order_count} orders worth ${money(r.order_value)}, average ${money(r.avg_order_value)}.${top ? ` Top seller: ${top.name}.` : ""}`, data: r };
       }
       case "generate_business_report": {
         const r = await generateReport(bid, (args.period as Period) || "month");
-        return { ok: true, summary: `This ${r.period}: revenue ${inr(r.revenue)}, expenses ${inr(r.expenses)}, net ${inr(r.net_profit)}. ${r.order_count} orders, ${inr(r.outstanding)} outstanding.`, data: r };
+        return { ok: true, summary: `This ${r.period}: revenue ${money(r.revenue)}, expenses ${money(r.expenses)}, net ${money(r.net_profit)}. ${r.order_count} orders, ${money(r.outstanding)} outstanding.`, data: r };
       }
       case "search_knowledge": {
         const passages = await searchKnowledge(bid, args.query || "");
@@ -189,12 +195,12 @@ export async function runTool(name: string, args: any, ctx: ToolContext): Promis
       case "list_unpaid": {
         const r = await listUnpaidInvoices(bid);
         if (r.count === 0) return { ok: true, summary: "Everything's paid — no outstanding invoices.", data: r };
-        return { ok: true, summary: `${r.count} unpaid invoice${r.count === 1 ? "" : "s"} totalling ${inr(r.total)}. Largest: ${r.invoices[0].customer} (${inr(r.invoices[0].due)}).`, data: r };
+        return { ok: true, summary: `${r.count} unpaid invoice${r.count === 1 ? "" : "s"} totalling ${money(r.total)}. Largest: ${r.invoices[0].customer} (${money(r.invoices[0].due)}).`, data: r };
       }
       case "get_expenses": {
         const r = await expenseSummary(bid);
         const top = r.categories[0];
-        return { ok: true, summary: r.count === 0 ? "No expenses recorded this month." : `This month's expenses are ${inr(r.total)} across ${r.count} entries.${top ? ` Biggest category: ${top.name} (${inr(top.value)}).` : ""}`, data: r };
+        return { ok: true, summary: r.count === 0 ? "No expenses recorded this month." : `This month's expenses are ${money(r.total)} across ${r.count} entries.${top ? ` Biggest category: ${top.name} (${money(top.value)}).` : ""}`, data: r };
       }
       case "attendance_today": {
         const r = await attendanceToday(bid);
@@ -211,7 +217,7 @@ export async function runTool(name: string, args: any, ctx: ToolContext): Promis
       case "payroll_summary": {
         const r = await payrollSummary(bid, args.month);
         if (!r.month) return { ok: true, summary: "No payroll has been run yet.", data: r };
-        return { ok: true, summary: `Payroll for ${r.month}: ${inr(r.net)} net across ${r.count} employees (${r.paid} paid, ${r.unpaid} pending).`, data: r };
+        return { ok: true, summary: `Payroll for ${r.month}: ${money(r.net)} net across ${r.count} employees (${r.paid} paid, ${r.unpaid} pending).`, data: r };
       }
       case "my_attendance": {
         const r = await myAttendance(bid, actor.userId);

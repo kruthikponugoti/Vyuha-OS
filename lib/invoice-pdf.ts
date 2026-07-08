@@ -2,6 +2,7 @@
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatMoney } from "@/lib/utils";
 
 export interface InvoiceDoc {
   number: string;
@@ -20,9 +21,10 @@ export interface InvoiceDoc {
   notes?: string | null;
 }
 
-const money = (n: number) => "INR " + n.toLocaleString("en-IN");
+// Uses the business currency from the invoice doc — no longer hardcoded to INR.
 
 export function generateInvoicePdf(doc: InvoiceDoc) {
+  const money = (n: number) => formatMoney(n, doc.business.currency);
   const pdf = new jsPDF({ unit: "pt", format: "a4" });
   const W = pdf.internal.pageSize.getWidth();
   const M = 40;
@@ -125,3 +127,4 @@ export function generateInvoicePdf(doc: InvoiceDoc) {
 
   pdf.save(`${doc.number}.pdf`);
 }
+

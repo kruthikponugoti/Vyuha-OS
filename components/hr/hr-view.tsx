@@ -13,7 +13,9 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { decideLeave, runPayroll } from "@/app/(app)/hr/actions";
 import { inr, formatDate, titleCase, cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { Check, X, Wallet } from "lucide-react";
+import { Check, X, Wallet, Download } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import type { Employee, Attendance, LeaveRequest, Payroll } from "@/lib/types";
 import type { ColumnDef, FieldDef } from "@/components/crud/types";
 
@@ -114,6 +116,69 @@ export function HrView({
     if (res.ok) { toast.success(`Marked ${res.count} payslips paid.`); router.refresh(); } else toast.error(res.error ?? "Failed.");
   }
 
+  function downloadAttendancePdf() {
+    try {
+      const pdf = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+      const W = pdf.internal.pageSize.getWidth();
+      const M = 40;
+      const ink = [27, 37, 89] as const;
+      const muted = [120, 128, 150] as const;
+
+      pdf.setFillColor(...ink);
+      [0, 13].forEach((dx) => [0, 13].forEach((dy) => pdf.rect(M + dx, 40 + dy, 10, 10, "F")));
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(15);
+      pdf.setTextColor(...ink);
+      pdf.text("Vyuha OS — Attendance Register", M + 34, 56);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.setTextColor(...muted);
+      pdf.text(`Period: ${attMonth} · Generated on ${formatDate(new Date())}`, M + 34, 70);
+
+      const headers = ["Employee", ...monthDays.map(String), "P / A / L"];
+      const rows = activeEmps.map((emp) => {
+        const t = totalsFor(emp.id);
+        const dayStatuses = monthDays.map((d) => {
+          const a = attByEmpDay[emp.id]?.[dayKey(d)];
+          if (!a) return "—";
+          const late = isLate(a);
+          switch (a.status) {
+            case "present": return late ? "P(L)" : "P";
+            case "remote": return "R";
+            case "half_day": return "HD";
+            case "leave": return "L";
+            case "absent": return "A";
+            default: return "—";
+          }
+        });
+        return [
+          emp.name,
+          ...dayStatuses,
+          `${t.present} / ${t.absent} / ${t.leave}${t.late > 0 ? ` (${t.late}L)` : ""}`,
+        ];
+      });
+
+      autoTable(pdf, {
+        startY: 90,
+        head: [headers],
+        body: rows,
+        theme: "grid",
+        headStyles: { fillColor: ink as any, textColor: [255, 255, 255], fontSize: 7, halign: "center" },
+        bodyStyles: { fontSize: 7, cellPadding: 4, textColor: [40, 45, 70] },
+        columnStyles: { 
+          0: { halign: "left", fontStyle: "bold", fontSize: 8 } 
+        },
+        margin: { left: M, right: M },
+      });
+
+      pdf.save(`attendance-register-${attMonth}.pdf`);
+      toast.success("Attendance register PDF downloaded.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to generate PDF.");
+    }
+  }
+
   return (
     <Tabs defaultValue="employees" className="p-5 sm:p-8">
      <TabsList>
@@ -149,14 +214,19 @@ export function HrView({
 
         {/* Monthly register */}
         <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardHeader className="flex-col gap-4 sm:flex-row sm:items-center sm:justify-between space-y-0">
             <div><CardTitle>Monthly register</CardTitle><CardDescription>Present, absent, leave and late per employee</CardDescription></div>
-            <div className="flex flex-wrap gap-1">
-              {attMonths.slice(0, 4).map((m) => (
-                <button key={m} onClick={() => setAttMonth(m)} className={cn("rounded-md px-2.5 py-1 text-xs font-medium", attMonth === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>
-                  {new Date(`${m}-01`).toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap gap-1">
+                {attMonths.slice(0, 4).map((m) => (
+                  <button key={m} onClick={() => setAttMonth(m)} className={cn("rounded-md px-2.5 py-1 text-xs font-medium", attMonth === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>
+                    {new Date(`${m}-01`).toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}
+                  </button>
+                ))}
+              </div>
+              <Button size="sm" variant="outline" onClick={downloadAttendancePdf}>
+                <Download className="h-4 w-4 mr-1" /> Export PDF
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = await getSession();
   if (!session) return Response.json({ error: "unauthorised" }, { status: 401 });
-  const data = await getDashboardData(session.business.id);
+  const data = await getDashboardData(session.business.id, session.business.timezone);
   return Response.json({
     revenueThisMonth: data.revenueThisMonth,
     revenueToday: data.revenueToday,

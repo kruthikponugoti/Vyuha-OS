@@ -16,13 +16,13 @@ import { routeLocally } from "@/lib/copilot/local-router";
 
 export const dynamic = "force-dynamic";
 
-const SYSTEM_PROMPT =
+const SYSTEM_PROMPT = (currency) =>
   "You are the AI Business Copilot for Vyuha OS, an operating system for small businesses. " +
   "Always call a function to answer questions about the business's data — never invent numbers, " +
   "names, or figures. For actions that change data (creating invoices or orders, recording " +
   "payments, updating stock, adding customers), confirm with the user before executing unless they " +
   "were explicit. Explain results in one or two concise, plain sentences a busy owner would " +
-  "understand. Currency is Indian Rupees (₹). No filler, no exclamation marks.";
+  "understand. Currency is " + currency + ". No filler, no exclamation marks.";
 
 // Tells the model the caller's role and that it must not attempt work outside
 // the tools it's been given — if asked, decline politely.
@@ -62,7 +62,7 @@ export async function POST(req) {
 
   try {
     const result = key
-      ? await runGemini(key, message, history, ctx, confirm)
+      ? await runGemini(key, message, history, ctx, confirm, session.business.currency)
       : await runLocal(message, ctx, confirm);
     return Response.json(result);
   } catch (err) {
@@ -76,12 +76,12 @@ export async function POST(req) {
 
 // ---- Gemini path -----------------------------------------------------------
 
-async function runGemini(key, message, history, ctx, confirm) {
+async function runGemini(key, message, history, ctx, confirm, currency) {
   const genAI = new GoogleGenerativeAI(key);
   // Role-gate the tools Gemini can even see, so it can't be a backdoor.
   const model = genAI.getGenerativeModel({
     model: "gemini-2.0-flash",
-    systemInstruction: SYSTEM_PROMPT + ROLE_NOTE(ctx.actor.role),
+    systemInstruction: SYSTEM_PROMPT(currency) + ROLE_NOTE(ctx.actor.role),
     tools: [{ functionDeclarations: declarationsForRole(ctx.actor.role) }],
   });
 

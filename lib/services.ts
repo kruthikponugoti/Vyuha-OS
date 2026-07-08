@@ -101,7 +101,6 @@ export async function resolveProduct(businessId: string, name: string): Promise<
   );
 }
 
-let invoiceCounter = 0;
 async function nextInvoiceNumber(businessId: string, type: "invoice" | "quotation") {
   const invoices = await all("invoices", businessId);
   const prefix = type === "quotation" ? "QUO" : "INV";
@@ -109,8 +108,7 @@ async function nextInvoiceNumber(businessId: string, type: "invoice" | "quotatio
   const nums = invoices
     .filter((i) => i.number.startsWith(prefix))
     .map((i) => parseInt(i.number.split("-").pop() || "0", 10));
-  const next = Math.max(0, ...nums, invoiceCounter) + 1;
-  invoiceCounter = next;
+  const next = Math.max(0, ...nums) + 1;
   return `${prefix}-${year}-${String(next).padStart(4, "0")}`;
 }
 
@@ -231,9 +229,11 @@ export async function createInvoiceDoc(
   if (!customer) throw new ServiceError(`No customer named "${input.customer_name}".`);
   const lines = await buildLines(actor.businessId, input.items);
 
-  const total = lines.reduce((s, l) => s + l.product.price * l.qty, 0);
+  // Tax-exclusive: subtotal = sum of line items, tax added on top.
+  const subtotal = lines.reduce((s, l) => s + l.product.price * l.qty, 0);
   const taxRate = input.taxRate ?? 18;
-  const subtotal = Math.round(total / (1 + taxRate / 100));
+  const taxAmount = Math.round(subtotal * taxRate / 100);
+  const total = subtotal + taxAmount;
   const number = await nextInvoiceNumber(actor.businessId, type);
   const now = new Date();
   const due = new Date(now.getTime() + 7 * 86400000);
@@ -251,7 +251,7 @@ export async function createInvoiceDoc(
       due_date: due.toISOString().slice(0, 10),
       subtotal,
       tax_rate: taxRate,
-      tax_amount: total - subtotal,
+      tax_amount: taxAmount,
       total,
       amount_paid: 0,
       notes: null,
@@ -262,8 +262,20 @@ export async function createInvoiceDoc(
   if (error) throw new ServiceError(error.message);
   const invoice = data as Invoice;
 
-  await audit(actor, "created", type, invoice.id, `Created ${type} ${number} for ${customer.name} — ₹${total.toLocaleString("en-IN")}`);
-  await notify(actor, `${type === "quotation" ? "Quotation" : "Invoice"} created`, `${number} for ${customer.name}, ₹${total.toLocaleString("en-IN")}.`, "info", "/finance/invoices");
+  // Persist line items so the invoice detail page and PDF can always show them.
+  for (const l of lines) {
+    await getDb().from("invoice_items").insert({
+      business_id: actor.businessId,
+      invoice_id: invoice.id,
+      product_id: l.product.id,
+      product_name: l.product.name,
+      qty: l.qty,
+      price: l.product.price,
+    });
+  }
+
+  await audit(actor, "created", type, invoice.id, `Created ${type} ${number} for ${customer.name} — ${total.toLocaleString("en-IN")}`);
+  await notify(actor, `${type === "quotation" ? "Quotation" : "Invoice"} created`, `${number} for ${customer.name}, ${total.toLocaleString("en-IN")}.`, "info", "/finance/invoices");
 
   return {
     invoice,
@@ -315,8 +327,8 @@ export async function recordPayment(
     await getDb().from("customers").update({ total_spend: customer.total_spend + amount }).eq("id", customer.id);
   }
 
-  await audit(actor, "recorded", "payment", invoice.id, `Recorded ₹${amount.toLocaleString("en-IN")} against ${invoice.number}`);
-  await notify(actor, "Payment received", `₹${amount.toLocaleString("en-IN")} recorded against ${invoice.number}.`, "success", "/finance/payments");
+  await audit(actor, "recorded", "payment", invoice.id, `Recorded ${amount.toLocaleString("en-IN")} against ${invoice.number}`);
+  await notify(actor, "Payment received", `${amount.toLocaleString("en-IN")} recorded against ${invoice.number}.`, "success", "/finance/payments");
 
   return { invoice: { ...invoice, amount_paid: newPaid, status }, amount, fullyPaid: status === "paid", customerName: customer?.name };
 }
@@ -332,11 +344,11 @@ export async function sendPaymentReminder(actor: Actor, customerName: string) {
 
   const dueTotal = unpaid.reduce((s, i) => s + (i.total - i.amount_paid), 0);
   const draft = `Hi ${customer.name.split(" ")[0]}, a friendly reminder that ${
-    unpaid.length === 1 ? `invoice ${unpaid[0].number} is` : `${unpaid.length} invoices totalling ₹${dueTotal.toLocaleString("en-IN")} are`
-  } due. You can pay by UPI or bank transfer at your convenience. Thank you — Vyuha Home Store.`;
+    unpaid.length === 1 ? `invoice ${unpaid[0].number} is` : `${unpaid.length} invoices totalling ${dueTotal.toLocaleString("en-IN")} are`
+  } due. You can pay by UPI or bank transfer at your convenience. Thank you.`;
 
-  await audit(actor, "drafted", "reminder", customer.id, `Drafted payment reminder for ${customer.name} (₹${dueTotal.toLocaleString("en-IN")})`);
-  await notify(actor, "Payment reminder drafted", `Reminder ready for ${customer.name} — ₹${dueTotal.toLocaleString("en-IN")} outstanding.`, "info", "/finance/invoices");
+  await audit(actor, "drafted", "reminder", customer.id, `Drafted payment reminder for ${customer.name} (${dueTotal.toLocaleString("en-IN")})`);
+  await notify(actor, "Payment reminder drafted", `Reminder ready for ${customer.name} — ${dueTotal.toLocaleString("en-IN")} outstanding.`, "info", "/finance/invoices");
 
   return { customer, unpaid, drafted: draft, dueTotal };
 }
@@ -417,7 +429,7 @@ export async function createOrderWorkflow(
       price: l.product.price,
     });
   }
-  steps.push({ label: `Created order for ${customer.name} — ₹${total.toLocaleString("en-IN")}`, status: "done" });
+  steps.push({ label: `Created order for ${customer.name} — ${total.toLocaleString("en-IN")}`, status: "done" });
 
   // 4. invoice
   const { invoice } = await createInvoiceDoc(actor, {
@@ -429,11 +441,11 @@ export async function createOrderWorkflow(
   steps.push({ label: `Generated invoice ${invoice.number}`, status: "done" });
 
   // 5. update customer record (activity/notes touch) + notification queue
-  await audit(actor, "created", "order", order.id, `Recorded order for ${customer.name} — ₹${total.toLocaleString("en-IN")}`);
-  const draft = `Hi ${customer.name.split(" ")[0]}, your order for ${lines.map((l) => `${l.qty} × ${l.product.name}`).join(", ")} is confirmed. Total ₹${total.toLocaleString("en-IN")}. Invoice ${invoice.number} to follow. — Vyuha Home Store`;
+  await audit(actor, "created", "order", order.id, `Recorded order for ${customer.name} — ${total.toLocaleString("en-IN")}`);
+  const draft = `Hi ${customer.name.split(" ")[0]}, your order for ${lines.map((l) => `${l.qty} × ${l.product.name}`).join(", ")} is confirmed. Total ${total.toLocaleString("en-IN")}. Invoice ${invoice.number} to follow.`;
   steps.push({ label: "Drafted customer confirmation (not sent)", status: "done" });
 
-  await notify(actor, "New order recorded", `${customer.name} — ₹${total.toLocaleString("en-IN")} (${invoice.number}).`, "success", "/finance/invoices");
+  await notify(actor, "New order recorded", `${customer.name} — ${total.toLocaleString("en-IN")} (${invoice.number}).`, "success", "/finance/invoices");
 
   return {
     order,

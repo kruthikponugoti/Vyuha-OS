@@ -23,21 +23,29 @@ export default async function InvoiceDetail({ params }: { params: { id: string }
   const invoice = await byId("invoices", bid, params.id);
   if (!invoice) notFound();
 
-  const [customer, orderItems, products] = await Promise.all([
+  const [customer, orderItems, products, invoiceItems] = await Promise.all([
     byId("customers", bid, invoice.customer_id),
     all("order_items", bid),
     all("products", bid),
+    all("invoice_items" as any, bid).catch(() => [] as any[]),
   ]);
 
   const prodName = (id: string) => products.find((p) => p.id === id)?.name ?? "Item";
   let items: { name: string; qty: number; price: number }[] = [];
-  if (invoice.order_id) {
+
+  // 1. Try invoice_items table first (new: persisted line items)
+  const invItems = (invoiceItems as any[]).filter((it: any) => it.invoice_id === invoice.id);
+  if (invItems.length > 0) {
+    items = invItems.map((it: any) => ({ name: it.product_name ?? prodName(it.product_id), qty: it.qty, price: it.price }));
+  }
+  // 2. Fallback: load from order_items if linked to an order
+  if (items.length === 0 && invoice.order_id) {
     items = orderItems
       .filter((it) => it.order_id === invoice.order_id)
       .map((it) => ({ name: prodName(it.product_id), qty: it.qty, price: it.price }));
   }
+  // 3. Last resort: single summary line
   if (items.length === 0) {
-    // quotation or order-less invoice — reconstruct a single summary line
     items = [{ name: invoice.notes || "Goods & services", qty: 1, price: invoice.subtotal }];
   }
 
@@ -48,7 +56,7 @@ export default async function InvoiceDetail({ params }: { params: { id: string }
     status: invoice.status,
     issue_date: formatDate(invoice.issue_date),
     due_date: formatDate(invoice.due_date),
-    business: { name: session.business.name, city: "Bengaluru, India", currency: session.business.currency },
+    business: { name: session.business.name, city: `${session.business.country}`, currency: session.business.currency },
     customer: customer ?? { name: "Customer" },
     items,
     subtotal: invoice.subtotal,
@@ -78,7 +86,7 @@ export default async function InvoiceDetail({ params }: { params: { id: string }
                 <VyuhaMark className="h-5 w-5 text-ink-800 dark:text-foreground" />
                 <span className="font-display text-lg font-semibold">{session.business.name}</span>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">Retail &amp; furniture · Bengaluru, India</p>
+              <p className="mt-1 text-sm text-muted-foreground">{session.business.industry} · {session.business.country}</p>
             </div>
             <div className="text-right">
               <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">

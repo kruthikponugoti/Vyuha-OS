@@ -22,8 +22,14 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-/** True when a Supabase project is configured at all (env present). */
-export const supabaseConfigured = Boolean(url && anonKey && url.startsWith("http"));
+/** True when a Supabase project is configured at all (env present and not a placeholder). */
+export const supabaseConfigured = Boolean(
+  url && 
+  anonKey && 
+  url.startsWith("http") && 
+  !anonKey.startsWith("sb_publishable_") && 
+  anonKey.startsWith("eyJ")
+);
 
 /**
  * Back-compat alias. Historically this meant "use Supabase". Now it only means
@@ -37,16 +43,16 @@ export const DEMO_AUTH_COOKIE = "vyuha-demo-auth";
 export const DEMO_ROLE_COOKIE = "vyuha-demo-role";
 
 /**
- * Is the current request a demo session? True when Supabase isn't configured,
- * or when the demo-auth cookie is present (role picker). Safe outside a request
- * (falls back to real when configured).
+ * Is the current request a demo session? True when the demo-auth cookie is
+ * explicitly present (role picker selected). Never falls back to true for real
+ * requests even if Supabase is not configured (which instead triggers an error).
  */
 export function isDemoRequest(): boolean {
-  if (!supabaseConfigured) return true;
   try {
     return Boolean(cookies().get(DEMO_AUTH_COOKIE));
   } catch {
-    return false;
+    // Fall back to checking configuration if cookies() cannot be accessed (e.g. static generation)
+    return !supabaseConfigured;
   }
 }
 
@@ -100,7 +106,17 @@ function supabaseRequestClient() {
 }
 
 export function getDb(): SupabaseClient | LocalClient {
-  if (supabaseConfigured && realMode()) {
+  if (realMode()) {
+    if (!supabaseConfigured) {
+      const errorMsg = !url || !anonKey 
+        ? "Supabase configuration is missing in real mode. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables."
+        : !url.startsWith("http")
+          ? `Supabase URL is invalid: "${url}". It must start with http/https.`
+          : anonKey.startsWith("sb_publishable_")
+            ? "Placeholder publishable key (sb_publishable_...) detected. Vyuha OS requires a valid Supabase anon key in real mode."
+            : "Supabase API key is invalid (must be a valid JWT starting with 'ey'). Please check your configuration.";
+      throw new Error(errorMsg);
+    }
     return supabaseRequestClient();
   }
   return new LocalClient(localDb(), bumpVersion);

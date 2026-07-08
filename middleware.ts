@@ -18,7 +18,7 @@ const PROTECTED = [
   "/onboarding",
 ];
 
-const AUTH_PAGES = ["/login", "/signup", "/forgot-password"];
+const AUTH_PAGES = ["/login", "/signup", "/forgot-password", "/reset-password", "/verify-email"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

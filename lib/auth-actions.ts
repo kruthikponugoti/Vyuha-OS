@@ -89,7 +89,13 @@ export async function signUp(
     password,
     options: { data: { full_name: name } },
   });
-  if (error) return { error: error.message };
+  if (error) {
+    let msg = error.message;
+    if (msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("email link")) {
+      msg = "Email confirmation rate limit exceeded. To bypass this requirement and sign up instantly, disable 'Confirm email' in your Supabase Auth Providers Settings (Authentication -> Providers -> Email -> toggle off 'Confirm email').";
+    }
+    return { error: msg };
+  }
   cookies().delete(DEMO_AUTH_COOKIE); // leave any demo session behind
   // If email confirmation is on, session is null until verified.
   if (!data.session) redirect("/verify-email");
@@ -177,10 +183,23 @@ export async function inviteTeamMember(email: string, role: Role) {
   // (Email delivery would use a server-side service-role client or an edge
   // function; that piece is not wired without keys.)
   if (isDemoRequest()) return { ok: true, demo: true };
+
+  const supabase = supabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  // Resolve the inviter's business from their profile.
+  const { data: profile } = await supabase
+    .from("users")
+    .select("business_id")
+    .eq("auth_id", user.id)
+    .maybeSingle();
+  if (!profile) return { ok: false, error: "No profile found for your account." };
+
   const db = getDb();
   const { error } = await db.from("users").insert({
     auth_id: null,
-    business_id: DEMO_BUSINESS_ID,
+    business_id: profile.business_id,
     name: email.split("@")[0],
     email,
     role,

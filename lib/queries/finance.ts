@@ -1,4 +1,4 @@
-import { all, startOfMonth, monthsAgo, monthKey, sum } from "@/lib/data";
+import { all, sum, formatDateTz, formatMonthTz, prevMonthKeyTz } from "@/lib/data";
 import type { Invoice, Payment, Expense, Order } from "@/lib/types";
 
 export interface FinanceData {
@@ -18,7 +18,7 @@ const LABEL = (key: string) => {
   return new Date(y, m - 1, 1).toLocaleDateString("en-IN", { month: "short" });
 };
 
-export async function getFinanceData(businessId: string): Promise<FinanceData> {
+export async function getFinanceData(businessId: string, tz: string = "Asia/Kolkata"): Promise<FinanceData> {
   const [invoices, payments, expenses, orders, orderItems, products] = await Promise.all([
     all("invoices", businessId),
     all("payments", businessId),
@@ -28,9 +28,11 @@ export async function getFinanceData(businessId: string): Promise<FinanceData> {
     all("products", businessId),
   ]);
 
-  const monthStart = startOfMonth();
-  const revenueThisMonth = sum(payments.filter((p: Payment) => new Date(p.paid_at) >= monthStart), (p) => p.amount);
-  const expensesThisMonth = sum(expenses.filter((e: Expense) => new Date(e.date) >= monthStart), (e) => e.amount);
+  const thisMonthStr = formatMonthTz(new Date(), tz);
+  const prevMonthStr = prevMonthKeyTz(tz);
+
+  const revenueThisMonth = sum(payments.filter((p: Payment) => formatDateTz(p.paid_at, tz).startsWith(thisMonthStr)), (p) => p.amount);
+  const expensesThisMonth = sum(expenses.filter((e: Expense) => formatDateTz(e.date, tz).startsWith(thisMonthStr)), (e) => e.amount);
 
   const outstanding = sum(invoices.filter((i: Invoice) => i.type === "invoice" && i.status !== "paid"), (i) => i.total - i.amount_paid);
   const overdueAmount = sum(invoices.filter((i: Invoice) => i.status === "overdue"), (i) => i.total - i.amount_paid);
@@ -38,13 +40,18 @@ export async function getFinanceData(businessId: string): Promise<FinanceData> {
 
   // 6-month cash series
   const series: Record<string, { inflow: number; outflow: number }> = {};
-  for (let i = 5; i >= 0; i--) series[monthKey(monthsAgo(i))] = { inflow: 0, outflow: 0 };
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = formatMonthTz(d, tz);
+    series[key] = { inflow: 0, outflow: 0 };
+  }
   for (const p of payments as Payment[]) {
-    const k = monthKey(p.paid_at);
+    const k = formatMonthTz(p.paid_at, tz);
     if (series[k]) series[k].inflow += p.amount;
   }
   for (const e of expenses as Expense[]) {
-    const k = monthKey(e.date);
+    const k = formatMonthTz(e.date, tz);
     if (series[k]) series[k].outflow += e.amount;
   }
   const cashSeries = Object.entries(series).map(([month, v]) => ({
@@ -56,7 +63,7 @@ export async function getFinanceData(businessId: string): Promise<FinanceData> {
 
   // P&L (this month): COGS estimated from cost of sold items this month
   const prodCost = new Map(products.map((p) => [p.id, p.cost]));
-  const monthOrderIds = new Set(orders.filter((o: Order) => new Date(o.created_at) >= monthStart).map((o) => o.id));
+  const monthOrderIds = new Set(orders.filter((o: Order) => formatDateTz(o.created_at, tz).startsWith(thisMonthStr)).map((o) => o.id));
   const cogs = sum(
     orderItems.filter((it) => monthOrderIds.has(it.order_id)),
     (it) => (prodCost.get(it.product_id) ?? 0) * it.qty
@@ -70,7 +77,7 @@ export async function getFinanceData(businessId: string): Promise<FinanceData> {
   };
 
   const byCat: Record<string, number> = {};
-  for (const e of expenses.filter((e: Expense) => new Date(e.date) >= monthsAgo(1))) {
+  for (const e of expenses.filter((e: Expense) => formatDateTz(e.date, tz).startsWith(thisMonthStr) || formatDateTz(e.date, tz).startsWith(prevMonthStr))) {
     byCat[e.category] = (byCat[e.category] || 0) + e.amount;
   }
   const expenseByCategory = Object.entries(byCat).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
