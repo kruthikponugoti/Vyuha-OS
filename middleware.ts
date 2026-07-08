@@ -37,6 +37,18 @@ export async function middleware(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   const usingSupabase = Boolean(url && anonKey && url.startsWith("http"));
 
+  // Hybrid: a demo session (role-picker cookie) is authenticated regardless of
+  // whether Supabase is configured — check it first so demo and real coexist.
+  const demoAuthed = Boolean(req.cookies.get("vyuha-demo-auth"));
+  if (demoAuthed) {
+    if (isAuthPage) {
+      const to = req.nextUrl.clone();
+      to.pathname = "/dashboard";
+      return NextResponse.redirect(to);
+    }
+    return nextWithPath();
+  }
+
   let authed = false;
 
   if (usingSupabase) {
