@@ -3,7 +3,7 @@
 import * as React from "react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 import { Card } from "@/components/ui/card";
-import { inr, cn } from "@/lib/utils";
+import { formatMoney, cn } from "@/lib/utils";
 import {
   TrendingUp, ShoppingCart, Users, Wallet, Boxes, ReceiptText,
 } from "lucide-react";
@@ -53,9 +53,11 @@ export type KpiKey = "revenue" | "orders" | "customers" | "outstanding";
 export function LiveKpis({
   initial,
   visible = ["revenue", "orders", "customers", "outstanding"],
+  currency = "INR",
 }: {
   initial: Metrics;
   visible?: KpiKey[];
+  currency?: string;
 }) {
   const [m, setM] = React.useState(initial);
   const [flash, setFlash] = React.useState<Record<string, boolean>>({});
@@ -84,21 +86,42 @@ export function LiveKpis({
   }, []);
 
   React.useEffect(() => {
-    const sb = supabaseBrowser;
-    if (sb) {
-      const ch = sb
-        .channel("dash-metrics")
-        .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "payments" }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "products" }, load)
-        .subscribe();
-      return () => {
-        sb.removeChannel(ch);
-      };
-    }
-    const t = setInterval(load, 5000);
-    return () => clearInterval(t);
+    let cancelled = false;
+    let cleanup = () => {};
+    (async () => {
+      // Whether to use Supabase Realtime is the server's call: in hybrid mode a
+      // demo-cookie user has a configured browser client but their data lives in
+      // the in-memory store, so we must poll instead of subscribing to nothing.
+      let realtime = false;
+      try {
+        const r = await fetch("/api/metrics", { cache: "no-store" });
+        if (r.ok) {
+          const j = await r.json();
+          realtime = Boolean(j.realtime);
+          prev.current = j;
+          setM(j);
+        }
+      } catch {
+        /* fall back to polling */
+      }
+      if (cancelled) return;
+
+      const sb = supabaseBrowser;
+      if (realtime && sb) {
+        const ch = sb
+          .channel("dash-metrics")
+          .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, load)
+          .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, load)
+          .on("postgres_changes", { event: "*", schema: "public", table: "payments" }, load)
+          .on("postgres_changes", { event: "*", schema: "public", table: "products" }, load)
+          .subscribe();
+        cleanup = () => { sb.removeChannel(ch); };
+      } else {
+        const t = setInterval(load, 5000);
+        cleanup = () => clearInterval(t);
+      }
+    })();
+    return () => { cancelled = true; cleanup(); };
   }, [load]);
 
   const count = visible.length;
@@ -108,7 +131,7 @@ export function LiveKpis({
   return (
     <div className={`grid grid-cols-1 gap-4 ${cols}`}>
       {show("revenue") && (
-        <Kpi icon="TrendingUp" label="Revenue this month" value={inr(m.revenueThisMonth)} sub={`${inr(m.revenueToday)} collected today`} flash={!!flash.revenueThisMonth} />
+        <Kpi icon="TrendingUp" label="Revenue this month" value={formatMoney(m.revenueThisMonth, currency)} sub={`${formatMoney(m.revenueToday, currency)} collected today`} flash={!!flash.revenueThisMonth} />
       )}
       {show("orders") && (
         <Kpi icon="ShoppingCart" label="Orders" value={String(m.ordersThisMonth)} sub={`${m.ordersToday} placed today`} flash={!!flash.ordersToday} />
@@ -120,7 +143,7 @@ export function LiveKpis({
         <Kpi
           icon="ReceiptText"
           label="Outstanding"
-          value={inr(m.outstanding)}
+          value={formatMoney(m.outstanding, currency)}
           sub="Unpaid & overdue invoices"
           flash={!!flash.outstanding}
           tone={m.outstanding > 0 ? "warning" : "default"}

@@ -4,6 +4,7 @@ import { all } from "@/lib/data";
 import { getDemandForecast } from "@/lib/queries/inventory";
 import { PageHeader } from "@/components/shell/page-header";
 import { InventoryView } from "@/components/inventory/inventory-view";
+import { RealtimeRegion } from "@/components/shell/realtime-region";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Inventory" };
@@ -24,16 +25,18 @@ export default async function InventoryPage() {
   return (
     <div>
       <PageHeader title="Inventory" description="Products, suppliers, stock movements and purchase orders." />
-      <InventoryView
-        products={products.sort((a, b) => a.name.localeCompare(b.name))}
-        suppliers={suppliers}
-        warehouses={warehouses}
-        categories={categories}
-        movements={movements}
-        purchaseOrders={purchaseOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())}
-        forecast={forecast}
-        canWrite={canWrite(session.user.role, "products")}
-      />
+      <RealtimeRegion tables={["products", "suppliers", "warehouses", "categories", "stock_movements", "purchase_orders"]}>
+        <InventoryView
+          products={products.sort((a, b) => a.name.localeCompare(b.name))}
+          suppliers={suppliers}
+          warehouses={warehouses}
+          categories={categories}
+          movements={movements}
+          purchaseOrders={purchaseOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())}
+          forecast={forecast}
+          canWrite={canWrite(session.user.role, "products")}
+        />
+      </RealtimeRegion>
     </div>
   );
 }
