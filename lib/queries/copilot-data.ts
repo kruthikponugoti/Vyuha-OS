@@ -101,6 +101,8 @@ export async function myAttendance(businessId: string, userId: string | null) {
     linked: true as const,
     employee: emp.name,
     today: todayRow?.status ?? "not marked",
+    check_in: todayRow?.check_in ?? null,
+    check_out: todayRow?.check_out ?? null,
     present_this_month: (tally.present || 0) + (tally.remote || 0),
     absent_this_month: tally.absent || 0,
     balance: leaveBalanceFor(emp.id, leaves as LeaveRequest[]),

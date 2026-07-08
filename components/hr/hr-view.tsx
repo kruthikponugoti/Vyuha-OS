@@ -62,18 +62,48 @@ export function HrView({
     { name: "performance_notes", label: "Performance notes", type: "textarea", full: true },
   ];
 
-  // attendance: last 14 days grid per employee
-  const days = [...new Set(attendance.map((a) => a.date))].sort().slice(-14);
-  const attByEmpDay: Record<string, Record<string, string>> = {};
-  for (const a of attendance) {
-    (attByEmpDay[a.employee_id] ??= {})[a.date] = a.status;
-  }
+  // ---- attendance derived data ----
+  const LATE_AFTER = "09:30";
+  const isLate = (a?: Attendance) => !!a && a.status === "present" && !!a.check_in && a.check_in > LATE_AFTER;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayByEmp = new Map(attendance.filter((a) => a.date === todayStr).map((a) => [a.employee_id, a]));
+  const activeEmps = employees.filter((e) => e.status !== "exited");
+  const todaySummary = {
+    present: activeEmps.filter((e) => { const a = todayByEmp.get(e.id); return a && (a.status === "present" || a.status === "remote"); }),
+    absent: activeEmps.filter((e) => todayByEmp.get(e.id)?.status === "absent"),
+    leave: activeEmps.filter((e) => todayByEmp.get(e.id)?.status === "leave"),
+    late: activeEmps.filter((e) => isLate(todayByEmp.get(e.id))),
+  };
+
+  // monthly register: pick a month, show a day grid with per-employee totals
+  const attMonths = [...new Set(attendance.map((a) => a.date.slice(0, 7)))].sort().reverse();
+  const [attMonth, setAttMonth] = React.useState(attMonths[0] ?? todayStr.slice(0, 7));
+  const [ry, rm] = attMonth.split("-").map(Number);
+  const daysInMonth = ry && rm ? new Date(ry, rm, 0).getDate() : 30;
+  const monthDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const attByEmpDay: Record<string, Record<string, Attendance>> = {};
+  for (const a of attendance) (attByEmpDay[a.employee_id] ??= {})[a.date] = a;
+  const dayKey = (d: number) => `${attMonth}-${String(d).padStart(2, "0")}`;
+  const totalsFor = (empId: string) => {
+    const rows = monthDays.map((d) => attByEmpDay[empId]?.[dayKey(d)]).filter(Boolean) as Attendance[];
+    return {
+      present: rows.filter((a) => a.status === "present" || a.status === "remote").length,
+      absent: rows.filter((a) => a.status === "absent").length,
+      leave: rows.filter((a) => a.status === "leave").length,
+      late: rows.filter((a) => isLate(a)).length,
+    };
+  };
 
   const pendingLeave = leave.filter((l) => l.status === "pending");
   const months = [...new Set(payroll.map((p) => p.month))].sort().reverse();
   const [payMonth, setPayMonth] = React.useState(months[0] ?? "");
   const monthPayroll = payroll.filter((p) => p.month === payMonth);
   const unpaidCount = monthPayroll.filter((p) => p.status !== "paid").length;
+  // attendance → payroll: days present/absent for the payroll month
+  const payDays = (empId: string) => {
+    const rows = Object.entries(attByEmpDay[empId] ?? {}).filter(([d]) => d.startsWith(payMonth)).map(([, a]) => a);
+    return { present: rows.filter((a) => a.status === "present" || a.status === "remote").length, absent: rows.filter((a) => a.status === "absent").length };
+  };
 
   async function decide(id: string, d: "approved" | "rejected") {
     const res = await decideLeave(id, d);
@@ -108,32 +138,67 @@ export function HrView({
         />
       </TabsContent>
 
-      <TabsContent value="attendance">
+      <TabsContent value="attendance" className="space-y-6">
+        {/* Today at a glance */}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard label="Present today" value={todaySummary.present.length} sub={`of ${activeEmps.length}`} tone="success" />
+          <StatCard label="Absent today" value={todaySummary.absent.length} sub={todaySummary.absent.map((e) => e.name.split(" ")[0]).join(", ") || "nobody"} tone={todaySummary.absent.length ? "danger" : "default"} />
+          <StatCard label="Late today" value={todaySummary.late.length} sub={todaySummary.late.map((e) => e.name.split(" ")[0]).join(", ") || "on time"} tone={todaySummary.late.length ? "warning" : "default"} />
+          <StatCard label="On leave today" value={todaySummary.leave.length} sub={todaySummary.leave.map((e) => e.name.split(" ")[0]).join(", ") || "nobody"} />
+        </div>
+
+        {/* Monthly register */}
         <Card>
-          <CardHeader><CardTitle>Attendance</CardTitle><CardDescription>Last {days.length} working days</CardDescription></CardHeader>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <div><CardTitle>Monthly register</CardTitle><CardDescription>Present, absent, leave and late per employee</CardDescription></div>
+            <div className="flex flex-wrap gap-1">
+              {attMonths.slice(0, 4).map((m) => (
+                <button key={m} onClick={() => setAttMonth(m)} className={cn("rounded-md px-2.5 py-1 text-xs font-medium", attMonth === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>
+                  {new Date(`${m}-01`).toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}
+                </button>
+              ))}
+            </div>
+          </CardHeader>
           <CardContent className="overflow-x-auto">
             <div className="mb-3 flex flex-wrap gap-3 text-xs">
               {Object.entries(ATT_TONE).map(([k, c]) => (
                 <span key={k} className="flex items-center gap-1.5"><span className={cn("h-2.5 w-2.5 rounded-full", c)} />{titleCase(k)}</span>
               ))}
+              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-success ring-2 ring-warning" />Late</span>
             </div>
             <table className="w-full">
               <thead>
                 <tr>
-                  <th className="pb-2 text-left text-2xs font-medium uppercase tracking-wide text-muted-foreground">Employee</th>
-                  {days.map((d) => <th key={d} className="pb-2 text-center text-2xs text-muted-foreground">{new Date(d).getDate()}</th>)}
+                  <th className="sticky left-0 bg-card pb-2 pr-3 text-left text-2xs font-medium uppercase tracking-wide text-muted-foreground">Employee</th>
+                  {monthDays.map((d) => <th key={d} className="pb-2 text-center text-[10px] text-muted-foreground">{d}</th>)}
+                  <th className="pb-2 pl-3 text-center text-2xs font-medium uppercase text-muted-foreground">P / A / L</th>
                 </tr>
               </thead>
               <tbody>
-                {employees.map((e) => (
-                  <tr key={e.id}>
-                    <td className="py-1.5 pr-4 text-sm font-medium">{e.name}</td>
-                    {days.map((d) => {
-                      const st = attByEmpDay[e.id]?.[d];
-                      return <td key={d} className="py-1.5 text-center"><span className={cn("mx-auto block h-4 w-4 rounded", st ? ATT_TONE[st] : "bg-muted")} title={st ? titleCase(st) : "—"} /></td>;
-                    })}
-                  </tr>
-                ))}
+                {activeEmps.map((e) => {
+                  const t = totalsFor(e.id);
+                  return (
+                    <tr key={e.id}>
+                      <td className="sticky left-0 bg-card py-1.5 pr-3 text-sm font-medium">{e.name}</td>
+                      {monthDays.map((d) => {
+                        const a = attByEmpDay[e.id]?.[dayKey(d)];
+                        const late = isLate(a);
+                        return (
+                          <td key={d} className="py-1.5 text-center">
+                            <span
+                              className={cn("mx-auto block h-3.5 w-3.5 rounded", a ? ATT_TONE[a.status] : "bg-muted/40", late && "ring-2 ring-warning")}
+                              title={a ? `${titleCase(a.status)}${a.check_in ? ` · in ${a.check_in}` : ""}${late ? " (late)" : ""}` : "—"}
+                            />
+                          </td>
+                        );
+                      })}
+                      <td className="whitespace-nowrap py-1.5 pl-3 text-center text-xs num">
+                        <span className="text-success">{t.present}</span> / <span className="text-destructive">{t.absent}</span> / <span className="text-muted-foreground">{t.leave}</span>
+                        {t.late > 0 && <span className="text-warning"> ({t.late}L)</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </CardContent>
@@ -194,20 +259,24 @@ export function HrView({
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead>Employee</TableHead><TableHead className="text-right">Gross</TableHead>
+                  <TableHead>Employee</TableHead><TableHead className="text-center">Present / Absent</TableHead><TableHead className="text-right">Gross</TableHead>
                   <TableHead className="text-right">Deductions</TableHead><TableHead className="text-right">Net</TableHead><TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {monthPayroll.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">{empNames[p.employee_id] ?? "—"}</TableCell>
-                    <TableCell className="num text-right">{inr(p.gross)}</TableCell>
-                    <TableCell className="num text-right text-muted-foreground">− {inr(p.deductions)}</TableCell>
-                    <TableCell className="num text-right font-medium">{inr(p.net)}</TableCell>
-                    <TableCell><Badge variant={p.status === "paid" ? "success" : "warning"} className="capitalize">{p.status}</Badge></TableCell>
-                  </TableRow>
-                ))}
+                {monthPayroll.map((p) => {
+                  const d = payDays(p.employee_id);
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{empNames[p.employee_id] ?? "—"}</TableCell>
+                      <TableCell className="num text-center"><span className="text-success">{d.present}</span> / <span className={d.absent ? "text-destructive" : "text-muted-foreground"}>{d.absent}</span></TableCell>
+                      <TableCell className="num text-right">{inr(p.gross)}</TableCell>
+                      <TableCell className="num text-right text-muted-foreground">− {inr(p.deductions)}</TableCell>
+                      <TableCell className="num text-right font-medium">{inr(p.net)}</TableCell>
+                      <TableCell><Badge variant={p.status === "paid" ? "success" : "warning"} className="capitalize">{p.status}</Badge></TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>

@@ -2,7 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { getSession, canWrite } from "@/lib/auth";
 import { getDashboardData, getRecentActivity, getMyTasks } from "@/lib/queries/dashboard";
+import { myAttendance } from "@/lib/queries/copilot-data";
 import { canSeeWidget, canAccessModule } from "@/lib/permissions";
+import { AttendanceCard } from "@/components/attendance/attendance-card";
 import { PageHeader } from "@/components/shell/page-header";
 import { LiveKpis, type KpiKey } from "@/components/dashboard/live-kpis";
 import { HealthRing } from "@/components/dashboard/health-ring";
@@ -45,10 +47,14 @@ export default async function DashboardPage() {
   const role = session.user.role;
   const show = (w: Parameters<typeof canSeeWidget>[1]) => canSeeWidget(role, w);
 
-  const [data, activity, myTasks] = await Promise.all([
+  // Self-service attendance for staff who clock in (not owner/admin, whose
+  // dashboards stay unchanged). Only shows if their account links to an employee.
+  const isStaff = ["manager", "finance", "sales", "hr", "employee"].includes(role);
+  const [data, activity, myTasks, myAtt] = await Promise.all([
     getDashboardData(session.business.id),
     show("activity") ? getRecentActivity(session.business.id) : Promise.resolve([]),
     show("my_tasks") ? getMyTasks(session.business.id, session.user.id) : Promise.resolve([]),
+    isStaff ? myAttendance(session.business.id, session.user.id) : Promise.resolve({ linked: false as const }),
   ]);
 
   const revDelta =
@@ -111,6 +117,25 @@ export default async function DashboardPage() {
               healthScore: data.healthScore,
             }}
           />
+        )}
+
+        {/* Self-service attendance for staff linked to an employee record */}
+        {myAtt.linked && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-1">
+              <AttendanceCard
+                data={{
+                  employee: myAtt.employee,
+                  today: myAtt.today,
+                  check_in: myAtt.check_in,
+                  check_out: myAtt.check_out,
+                  present_this_month: myAtt.present_this_month,
+                  absent_this_month: myAtt.absent_this_month,
+                  balance: myAtt.balance,
+                }}
+              />
+            </div>
+          </div>
         )}
 
         {/* Charts + health */}

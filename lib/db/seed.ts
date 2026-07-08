@@ -36,6 +36,7 @@ export const USER_IDS = {
 export function buildSeedDatabase(now = Date.now()): LocalDatabase {
   const rand = rng(42);
   const int = (a: number, b: number) => a + Math.floor(rand() * (b - a + 1));
+  const pad2 = (n: number) => String(n).padStart(2, "0");
   const pick = <T>(arr: T[]): T => arr[Math.floor(rand() * arr.length)];
   const iso = (t: number) => new Date(t).toISOString();
   const ymd = (t: number) => new Date(t).toISOString().slice(0, 10);
@@ -525,8 +526,8 @@ export function buildSeedDatabase(now = Date.now()): LocalDatabase {
         employee_id: emp.id,
         date: ymd(dt.getTime()),
         status,
-        check_in: status === "absent" || status === "leave" ? null : `09:${int(15, 55)}`,
-        check_out: status === "absent" || status === "leave" ? null : status === "half_day" ? `13:${int(0, 30)}` : `18:${int(0, 45)}`,
+        check_in: status === "absent" || status === "leave" ? null : `09:${pad2(int(15, 55))}`,
+        check_out: status === "absent" || status === "leave" ? null : status === "half_day" ? `13:${pad2(int(0, 30))}` : `18:${pad2(int(0, 45))}`,
       });
     }
   }
