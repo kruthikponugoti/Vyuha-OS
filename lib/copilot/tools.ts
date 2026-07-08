@@ -7,7 +7,12 @@ import * as svc from "@/lib/services";
 import { getRevenue, analyzeSales, generateReport, type Period } from "@/lib/queries/reports";
 import { getDashboardData } from "@/lib/queries/dashboard";
 import { searchKnowledge } from "@/lib/queries/knowledge";
-import { inr } from "@/lib/utils";
+import {
+  listUnpaidInvoices, expenseSummary, attendanceToday, employeeLeave, myAttendance, projectStatus, payrollSummary,
+} from "@/lib/queries/copilot-data";
+import { getHelp } from "@/lib/copilot/help";
+import { canUseTool, TOOL_MODULE, MODULE_LABELS, type ModuleKey } from "@/lib/permissions";
+import { inr, titleCase } from "@/lib/utils";
 
 export interface ToolContext {
   actor: Actor;
@@ -38,6 +43,14 @@ export const ACTION_LABELS: Record<string, string> = {
   analyze_sales: "Analysed sales",
   generate_business_report: "Generated report",
   search_knowledge: "Searched knowledge base",
+  list_unpaid: "Checked unpaid invoices",
+  get_expenses: "Checked expenses",
+  attendance_today: "Checked attendance",
+  employee_leave: "Checked leave",
+  payroll_summary: "Checked payroll",
+  my_attendance: "Checked your attendance",
+  project_status: "Checked projects",
+  get_help: "Answered a question",
 };
 
 // Actions that mutate data — the Copilot confirms before running these.
@@ -77,11 +90,38 @@ export const FUNCTION_DECLARATIONS = [
   { name: "analyze_sales", description: "Analyse sales for a period: order count, value, top products, categories.", parameters: { type: "object", properties: { period: { type: "string", enum: ["today", "week", "month", "quarter", "year"] } } } },
   { name: "generate_business_report", description: "A summary business report for a period: revenue, expenses, profit, outstanding.", parameters: { type: "object", properties: { period: { type: "string", enum: ["today", "week", "month", "quarter", "year"] } } } },
   { name: "search_knowledge", description: "Answer a policy or process question using the business's uploaded knowledge base documents (return policy, warranty, operations handbook, etc.). Use this for 'what is our...', 'how do we...' questions.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
+  { name: "list_unpaid", description: "List unpaid/overdue invoices and total amount due.", parameters: { type: "object", properties: {} } },
+  { name: "get_expenses", description: "Summarise this month's expenses by category.", parameters: { type: "object", properties: {} } },
+  { name: "attendance_today", description: "Who is present, absent, on leave or half-day today.", parameters: { type: "object", properties: {} } },
+  { name: "employee_leave", description: "How much leave a named employee has left and any pending requests.", parameters: { type: "object", properties: { employee_name: { type: "string" } }, required: ["employee_name"] } },
+  { name: "payroll_summary", description: "Payroll totals for a month: gross, net, how many paid/unpaid.", parameters: { type: "object", properties: { month: { type: "string", description: "YYYY-MM, optional" } } } },
+  { name: "my_attendance", description: "The asking user's own attendance this month and leave balance.", parameters: { type: "object", properties: {} } },
+  { name: "project_status", description: "Status and task completion of projects.", parameters: { type: "object", properties: {} } },
+  { name: "get_help", description: "Answer questions about Vyuha OS itself: what modules exist, what the user's role can do, or how to perform a task.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
 ];
+
+/** Tool declarations a role is allowed to call (role-gated for Gemini). */
+export function declarationsForRole(role: import("@/lib/types").Role) {
+  return FUNCTION_DECLARATIONS.filter((d) => canUseTool(role, d.name));
+}
+
+/** Polite refusal when a role asks for a tool it can't use. */
+export function refusalFor(role: import("@/lib/types").Role, tool: string): ToolResult {
+  const mod = TOOL_MODULE[tool];
+  const where = mod ? MODULE_LABELS[mod as ModuleKey] : "that";
+  return {
+    ok: false,
+    summary: `Your role (${titleCase(role)}) doesn't have access to ${where}. Ask an owner or admin if you need it.`,
+    error: "forbidden",
+  };
+}
 
 export async function runTool(name: string, args: any, ctx: ToolContext): Promise<ToolResult> {
   const { actor } = ctx;
   const bid = actor.businessId;
+  // Backstop: the Copilot must never be a way around the UI/RLS. Even if a tool
+  // slipped into the model's options, refuse here if the role can't use it.
+  if (!canUseTool(actor.role, name)) return refusalFor(actor.role, name);
   try {
     switch (name) {
       case "get_revenue": {
@@ -145,6 +185,49 @@ export async function runTool(name: string, args: any, ctx: ToolContext): Promis
         const answer = passages.map((p) => p.text).join(" ");
         const sources = [...new Set(passages.map((p) => p.fileName))];
         return { ok: true, summary: `${answer} (From ${sources.join(", ")}.)`, data: { passages, sources } };
+      }
+      case "list_unpaid": {
+        const r = await listUnpaidInvoices(bid);
+        if (r.count === 0) return { ok: true, summary: "Everything's paid — no outstanding invoices.", data: r };
+        return { ok: true, summary: `${r.count} unpaid invoice${r.count === 1 ? "" : "s"} totalling ${inr(r.total)}. Largest: ${r.invoices[0].customer} (${inr(r.invoices[0].due)}).`, data: r };
+      }
+      case "get_expenses": {
+        const r = await expenseSummary(bid);
+        const top = r.categories[0];
+        return { ok: true, summary: r.count === 0 ? "No expenses recorded this month." : `This month's expenses are ${inr(r.total)} across ${r.count} entries.${top ? ` Biggest category: ${top.name} (${inr(top.value)}).` : ""}`, data: r };
+      }
+      case "attendance_today": {
+        const r = await attendanceToday(bid);
+        if (r.total === 0) return { ok: true, summary: "No employees on record yet.", data: r };
+        const absentNames = r.absent.map((a) => a.name).join(", ");
+        return { ok: true, summary: `Today: ${r.present.length} present, ${r.absent.length} absent, ${r.on_leave.length} on leave, ${r.half_day.length} half-day.${r.absent.length ? ` Absent: ${absentNames}.` : ""}`, data: r };
+      }
+      case "employee_leave": {
+        const r = await employeeLeave(bid, args.employee_name || "");
+        if (!r.found) return { ok: false, summary: `I couldn't find an employee named “${args.employee_name}”.`, error: "not_found" };
+        const parts = r.balance.map((b) => `${b.left} ${b.type}`).join(", ");
+        return { ok: true, summary: `${r.employee} has ${parts} leave left${r.pending ? `, with ${r.pending} pending request${r.pending === 1 ? "" : "s"}` : ""}.`, data: r };
+      }
+      case "payroll_summary": {
+        const r = await payrollSummary(bid, args.month);
+        if (!r.month) return { ok: true, summary: "No payroll has been run yet.", data: r };
+        return { ok: true, summary: `Payroll for ${r.month}: ${inr(r.net)} net across ${r.count} employees (${r.paid} paid, ${r.unpaid} pending).`, data: r };
+      }
+      case "my_attendance": {
+        const r = await myAttendance(bid, actor.userId);
+        if (!r.linked) return { ok: true, summary: "Your account isn't linked to an employee record, so I can't show your attendance.", data: r };
+        const parts = r.balance.map((b) => `${b.left} ${b.type}`).join(", ");
+        return { ok: true, summary: `You're marked “${r.today}” today. This month: ${r.present_this_month} present, ${r.absent_this_month} absent. Leave left: ${parts}.`, data: r };
+      }
+      case "project_status": {
+        const r = await projectStatus(bid);
+        if (r.count === 0) return { ok: true, summary: "No projects yet.", data: r };
+        const active = r.projects.filter((p) => p.status === "active");
+        return { ok: true, summary: `${r.count} project${r.count === 1 ? "" : "s"}, ${active.length} active. ${r.projects.slice(0, 3).map((p) => `${p.name} (${p.pct}%)`).join(", ")}.`, data: r };
+      }
+      case "get_help": {
+        const r = getHelp(actor.role, args.query || "");
+        return { ok: true, summary: r.answer, data: { help: true } };
       }
       default:
         return { ok: false, summary: `Unknown action ${name}.`, error: "unknown_tool" };

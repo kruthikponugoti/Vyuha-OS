@@ -37,6 +37,42 @@ export function routeLocally(message: string): ParsedIntent {
     return { tool: "search_knowledge", args: { query: message } };
   }
 
+  // product help (meta questions about Vyuha OS itself)
+  if (/what can (you|i) do|what modules|which modules|what.*(features|capabilities)|how do i (create|make|add|record|generate|export|clock)|what can (a |an )?\w+ (do|access|see)|what('?s| is) my (role|access)|help me (get started|use)/.test(q)) {
+    return { tool: "get_help", args: { query: message } };
+  }
+
+  // my own attendance / leave
+  if (/\bmy (attendance|leave|leaves|balance)\b|am i (present|marked|in)|how many leaves? (do|have) i/.test(q)) {
+    return { tool: "my_attendance", args: {} };
+  }
+  // a named employee's leave
+  if (/leaves? (left|balance|remaining)|how many leaves? (does|has)/.test(q)) {
+    const m = message.match(/(?:does|has|for|of)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+    if (m) return { tool: "employee_leave", args: { employee_name: m[1].trim() } };
+  }
+  // payroll (HR-only; routes here so restricted roles get a clear refusal)
+  if (/\bpayroll\b|salaries|salary (run|paid|this month)|payslip/.test(q)) {
+    const mm = message.match(/(\d{4}-\d{2})/);
+    return { tool: "payroll_summary", args: mm ? { month: mm[1] } : {} };
+  }
+  // attendance today
+  if (/who('?s| is| are)?\s*(absent|present|in|off|on leave|out)\s*(today)?|attendance (today|now)|who.*(absent|present).*today/.test(q)) {
+    return { tool: "attendance_today", args: {} };
+  }
+  // unpaid / overdue invoices
+  if (/unpaid|who (hasn'?t|has not|have not|haven'?t) paid|outstanding invoice|overdue|who owes|amount due|not paid|pending payment/.test(q)) {
+    return { tool: "list_unpaid", args: {} };
+  }
+  // expenses
+  if (/\bexpenses?\b|how much.*(spen[dt]|cost)|spending this month|our costs/.test(q)) {
+    return { tool: "get_expenses", args: {} };
+  }
+  // project status
+  if (/project status|how (are|is).*(project|the projects)|projects?.*(going|progress|status)|status of.*project/.test(q)) {
+    return { tool: "project_status", args: {} };
+  }
+
   // health
   if (/business health|how('?s| is) (the |my )?business|health score/.test(q)) {
     return { tool: "get_business_health", args: {} };

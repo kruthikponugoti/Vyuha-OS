@@ -23,19 +23,18 @@ interface Msg {
   ok?: boolean;
 }
 
-const SUGGESTIONS = [
+const DEFAULT_SUGGESTIONS = [
   "How's the business doing this month?",
   "How much stock of Oak Bookshelf is left?",
   "Record an order from Ananya Reddy — 2 Cane Lounge Chair",
   "Who hasn't paid yet?",
-  "Show this month's revenue",
-  "Draft a payment reminder for Sterling Hotels",
 ];
 
 let idc = 0;
 const nid = () => `m${++idc}`;
 
-export function CopilotChat() {
+export function CopilotChat({ suggestions }: { suggestions?: string[] }) {
+  const SUGGESTIONS = suggestions && suggestions.length ? suggestions : DEFAULT_SUGGESTIONS;
   const [messages, setMessages] = React.useState<Msg[]>([]);
   const [input, setInput] = React.useState("");
   const [loading, setLoading] = React.useState(false);

@@ -9,8 +9,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getSession } from "@/lib/auth";
 import { actorFromSession } from "@/lib/services";
 import {
-  FUNCTION_DECLARATIONS, ACTION_LABELS, DESTRUCTIVE, runTool,
+  ACTION_LABELS, DESTRUCTIVE, runTool, declarationsForRole, refusalFor,
 } from "@/lib/copilot/tools";
+import { canUseTool } from "@/lib/permissions";
 import { routeLocally } from "@/lib/copilot/local-router";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,12 @@ const SYSTEM_PROMPT =
   "payments, updating stock, adding customers), confirm with the user before executing unless they " +
   "were explicit. Explain results in one or two concise, plain sentences a busy owner would " +
   "understand. Currency is Indian Rupees (₹). No filler, no exclamation marks.";
+
+// Tells the model the caller's role and that it must not attempt work outside
+// the tools it's been given — if asked, decline politely.
+const ROLE_NOTE = (role) =>
+  ` The person you're helping has the ${role} role. Only the tools you have been given are available to that role. ` +
+  `If they ask for something outside those tools (for example an employee asking about payroll, or a role asking about a module they can't access), politely say their role doesn't have access to it — never guess or reveal that data.`;
 
 function shapeResponse(toolName, result) {
   return {
@@ -71,10 +78,11 @@ export async function POST(req) {
 
 async function runGemini(key, message, history, ctx, confirm) {
   const genAI = new GoogleGenerativeAI(key);
+  // Role-gate the tools Gemini can even see, so it can't be a backdoor.
   const model = genAI.getGenerativeModel({
     model: "gemini-2.0-flash",
-    systemInstruction: SYSTEM_PROMPT,
-    tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
+    systemInstruction: SYSTEM_PROMPT + ROLE_NOTE(ctx.actor.role),
+    tools: [{ functionDeclarations: declarationsForRole(ctx.actor.role) }],
   });
 
   const chat = model.startChat({
@@ -132,6 +140,12 @@ async function runLocal(message, ctx, confirm) {
       action: null,
       ok: true,
     };
+  }
+
+  // Role gate before anything else — never confirm or run a forbidden tool.
+  if (!canUseTool(ctx.actor.role, tool)) {
+    const refusal = refusalFor(ctx.actor.role, tool);
+    return { reply: refusal.summary, action: null, ok: false };
   }
 
   if (DESTRUCTIVE.has(tool) && !confirm) {
