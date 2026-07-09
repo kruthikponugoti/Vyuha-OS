@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { usingSupabase, isDemoRequest, getDb, DEMO_BUSINESS_ID } from "./db";
 import { supabaseServer, DEMO_AUTH_COOKIE, DEMO_ROLE_COOKIE } from "./auth";
+import { supabaseAdmin, adminConfigured } from "./supabase-admin";
 import type { Role } from "./types";
 import { ROLES } from "./types";
 
@@ -178,31 +179,124 @@ export async function completeOnboarding(
   redirect("/dashboard");
 }
 
-export async function inviteTeamMember(email: string, role: Role) {
-  // Real mode: create a pending user row scoped to the inviter's business.
-  // (Email delivery would use a server-side service-role client or an edge
-  // function; that piece is not wired without keys.)
-  if (isDemoRequest()) return { ok: true, demo: true };
+// A readable but strong temporary password to hand over.
+function makeTempPassword() {
+  const words = ["Vyuha", "Swift", "Bright", "Nova", "Prime", "Bold", "Zen", "Peak"];
+  const w = words[Math.floor(Math.random() * words.length)];
+  const n = Math.floor(1000 + Math.random() * 9000);
+  const sym = "!@#$%&".charAt(Math.floor(Math.random() * 6));
+  return `${w}-${n}${sym}`;
+}
 
+export interface StaffResult {
+  ok: boolean;
+  error?: string;
+  tempPassword?: string;
+  invited?: boolean;
+  demo?: boolean;
+}
+
+/**
+ * Owner/Admin-only staff provisioning. Two paths:
+ *  - "temp":   creates the auth account with a temporary password (returned to
+ *              copy), forcing a password change on first login.
+ *  - "invite": emails a set-password link (needs SMTP configured in Supabase).
+ * Demo mode simulates the account so the flow is exercisable without real auth.
+ */
+export async function createStaffAccount(input: {
+  name: string;
+  email: string;
+  role: Role;
+  method: "temp" | "invite";
+}): Promise<StaffResult> {
+  const email = input.email.trim().toLowerCase();
+  const name = input.name.trim() || email.split("@")[0];
+  const role = input.role;
+  if (!email.includes("@")) return { ok: false, error: "Enter a valid email address." };
+  if (!ROLES.includes(role)) return { ok: false, error: "Pick a valid role." };
+  if (role === "owner") return { ok: false, error: "Owner is reserved for the business creator — pick another role." };
+
+  // Demo: simulate a provisioned profile so the flow is testable without auth.
+  if (isDemoRequest()) {
+    const db = getDb();
+    const { error } = await db.from("users").insert({
+      auth_id: null, business_id: DEMO_BUSINESS_ID, name, email, role,
+      active: true, must_change_password: true,
+    });
+    if (error) return { ok: false, error: error.message };
+    return {
+      ok: true, demo: true,
+      tempPassword: input.method === "temp" ? makeTempPassword() : undefined,
+      invited: input.method === "invite",
+    };
+  }
+
+  // Real: resolve the caller + their business, then provision via the admin API.
   const supabase = supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in." };
-
-  // Resolve the inviter's business from their profile.
   const { data: profile } = await supabase
-    .from("users")
-    .select("business_id")
-    .eq("auth_id", user.id)
-    .maybeSingle();
+    .from("users").select("business_id, role").eq("auth_id", user.id).maybeSingle();
   if (!profile) return { ok: false, error: "No profile found for your account." };
+  if (!["owner", "admin"].includes(profile.role)) return { ok: false, error: "Only an owner or admin can add staff." };
 
-  const db = getDb();
-  const { error } = await db.from("users").insert({
-    auth_id: null,
-    business_id: profile.business_id,
-    name: email.split("@")[0],
-    email,
-    role,
+  if (!adminConfigured) {
+    return { ok: false, error: "Staff accounts need the SUPABASE_SERVICE_ROLE_KEY server environment variable. Add it in your host, then try again." };
+  }
+  const admin = supabaseAdmin();
+
+  let authId: string;
+  let tempPassword: string | undefined;
+  if (input.method === "invite") {
+    const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${siteUrl()}/set-password`,
+      data: { full_name: name },
+    });
+    if (error) return { ok: false, error: error.message };
+    authId = data.user.id;
+  } else {
+    tempPassword = makeTempPassword();
+    const { data, error } = await admin.auth.admin.createUser({
+      email, password: tempPassword, email_confirm: true, user_metadata: { full_name: name },
+    });
+    if (error) return { ok: false, error: error.message };
+    authId = data.user.id;
+  }
+
+  const { error: insErr } = await admin.from("users").insert({
+    auth_id: authId, business_id: profile.business_id, name, email, role,
+    active: true, must_change_password: true,
   });
-  return { ok: !error, error: error?.message };
+  if (insErr) {
+    await admin.auth.admin.deleteUser(authId).catch(() => {}); // don't orphan the auth user
+    return { ok: false, error: insErr.message };
+  }
+  return { ok: true, tempPassword, invited: input.method === "invite" };
+}
+
+/**
+ * Sets a new password for the signed-in user and clears the forced-change flag.
+ * Used by the first-login change-password gate.
+ */
+export async function setNewPassword(
+  _prev: unknown,
+  formData: FormData
+): Promise<{ error: string } | void> {
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+  if (password.length < 8) return { error: "Use at least 8 characters." };
+  if (password !== confirm) return { error: "The two passwords don't match." };
+
+  if (isDemoRequest()) redirect("/dashboard"); // demo has no real credential to change
+
+  const supabase = supabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired. Please sign in again." };
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: error.message };
+  // Clear the forced-change flag (needs admin — the user can't write their own row).
+  if (adminConfigured) {
+    await supabaseAdmin().from("users").update({ must_change_password: false }).eq("auth_id", user.id);
+  }
+  redirect("/dashboard");
 }

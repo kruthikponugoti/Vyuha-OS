@@ -110,6 +110,7 @@ export async function getSession(): Promise<Session | null> {
     .eq("auth_id", authUser.id)
     .maybeSingle();
   if (!profile) return null;
+  if (profile.active === false) return null; // deactivated accounts get no session
 
   const { data: business } = await supabase
     .from("businesses")

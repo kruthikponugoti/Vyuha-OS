@@ -12,11 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { updateBusiness, inviteMember, updateMemberRole } from "@/app/(app)/settings/actions";
+import { updateBusiness, addStaffMember, updateMemberRole, setMemberActive } from "@/app/(app)/settings/actions";
 import { titleCase, formatDateTime } from "@/lib/utils";
 import { ROLES } from "@/lib/types";
 import { toast } from "sonner";
-import { Plus, Copy, Check } from "lucide-react";
+import { Plus, Copy, Check, UserPlus, UserX, UserCheck } from "lucide-react";
 import type { Business, User, AuditLog, Role } from "@/lib/types";
 
 const INDUSTRIES = ["Retail", "Restaurants", "Healthcare", "Education", "Manufacturing", "Agencies", "Construction", "Hospitality", "Professional Services", "Wholesale"];
@@ -35,8 +35,13 @@ export function SettingsView({
   const router = useRouter();
   const [biz, setBiz] = React.useState(business);
   const [savingBiz, setSavingBiz] = React.useState(false);
-  const [inviteEmail, setInviteEmail] = React.useState("");
-  const [inviteRole, setInviteRole] = React.useState<Role>("sales");
+  const [staffName, setStaffName] = React.useState("");
+  const [staffEmail, setStaffEmail] = React.useState("");
+  const [staffRole, setStaffRole] = React.useState<Role>("sales");
+  const [staffMethod, setStaffMethod] = React.useState<"temp" | "invite">("temp");
+  const [creating, setCreating] = React.useState(false);
+  const [cred, setCred] = React.useState<{ email: string; tempPassword?: string; invited?: boolean; demo?: boolean } | null>(null);
+  const [credCopied, setCredCopied] = React.useState(false);
   const [notifPrefs, setNotifPrefs] = React.useState({ lowStock: true, overdue: true, newOrders: true, weekly: false });
   const [copied, setCopied] = React.useState(false);
   const canManage = ["owner", "admin"].includes(user.role);
@@ -47,15 +52,26 @@ export function SettingsView({
     setSavingBiz(false);
     if (res.ok) { toast.success("Business settings saved."); router.refresh(); } else toast.error(res.error ?? "Save failed.");
   }
-  async function invite() {
-    if (!inviteEmail.includes("@")) return toast.error("Enter a valid email.");
-    const res = await inviteMember(inviteEmail, inviteRole);
-    if (res.ok) { toast.success(res.demo ? "Invite recorded (demo — no email sent)." : "Invite sent."); setInviteEmail(""); router.refresh(); }
-    else toast.error(res.error ?? "Invite failed.");
+  async function createStaff() {
+    if (!staffEmail.includes("@")) return toast.error("Enter a valid email.");
+    setCreating(true);
+    const res = await addStaffMember({ name: staffName, email: staffEmail, role: staffRole, method: staffMethod });
+    setCreating(false);
+    if (res.ok) {
+      setCred({ email: staffEmail, tempPassword: res.tempPassword, invited: res.invited, demo: res.demo });
+      toast.success(res.invited ? "Invite email sent." : "Account created.");
+      setStaffName(""); setStaffEmail("");
+      router.refresh();
+    } else toast.error(res.error ?? "Couldn't create the account.");
   }
   async function changeRole(id: string, role: Role) {
     const res = await updateMemberRole(id, role);
     if (res.ok) { toast.success("Role updated."); router.refresh(); } else toast.error(res.error ?? "Failed.");
+  }
+  async function toggleActive(id: string, active: boolean) {
+    const res = await setMemberActive(id, active);
+    if (res.ok) { toast.success(active ? "Account reactivated." : "Account deactivated."); router.refresh(); }
+    else toast.error(res.error ?? "Failed.");
   }
 
   return (
@@ -116,24 +132,62 @@ export function SettingsView({
           <CardHeader><CardTitle>Team members</CardTitle><CardDescription>{team.length} people in {business.name}.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
             {canManage && (
-              <div className="flex flex-col gap-2 rounded-card border border-border bg-secondary/30 p-3 sm:flex-row">
-                <Input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="teammate@business.com" className="flex-1" />
-                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as Role)}>
-                  <SelectTrigger className="sm:w-40"><SelectValue /></SelectTrigger>
-                  <SelectContent>{ROLES.filter((r) => r !== "owner").map((r) => <SelectItem key={r} value={r} className="capitalize">{titleCase(r)}</SelectItem>)}</SelectContent>
-                </Select>
-                <Button onClick={invite}><Plus className="h-4 w-4" /> Invite</Button>
+              <div className="space-y-3 rounded-card border border-border bg-secondary/30 p-3">
+                <div className="flex items-center gap-2 text-sm font-medium"><UserPlus className="h-4 w-4 text-primary" /> Add a staff member</div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Input value={staffName} onChange={(e) => setStaffName(e.target.value)} placeholder="Full name" />
+                  <Input value={staffEmail} onChange={(e) => setStaffEmail(e.target.value)} placeholder="name@business.com" type="email" />
+                  <Select value={staffRole} onValueChange={(v) => setStaffRole(v as Role)}>
+                    <SelectTrigger aria-label="Role"><SelectValue /></SelectTrigger>
+                    <SelectContent>{ROLES.filter((r) => r !== "owner").map((r) => <SelectItem key={r} value={r} className="capitalize">{titleCase(r)}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Select value={staffMethod} onValueChange={(v) => setStaffMethod(v as "temp" | "invite")}>
+                    <SelectTrigger aria-label="Credential method"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="temp">Temporary password</SelectItem>
+                      <SelectItem value="invite">Email an invite link</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">They&apos;ll set their own password on first sign-in.</p>
+                  <Button onClick={createStaff} disabled={creating}>{creating ? "Creating…" : <><Plus className="h-4 w-4" /> Create account</>}</Button>
+                </div>
+                {cred && (
+                  <div className="rounded-md border border-success/30 bg-success-soft/60 p-3 text-sm">
+                    {cred.invited ? (
+                      <p>Invite link emailed to <span className="font-medium">{cred.email}</span>.{cred.demo ? " (demo — no email actually sent)" : ""}</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <p>Account for <span className="font-medium">{cred.email}</span> is ready. Share this temporary password — they&apos;ll change it on first login{cred.demo ? " (demo simulation)" : ""}:</p>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 rounded bg-card px-2.5 py-1.5 font-mono text-sm">{cred.tempPassword}</code>
+                          <Button variant="outline" size="icon-sm" aria-label="Copy password" onClick={() => { navigator.clipboard?.writeText(cred.tempPassword ?? ""); setCredCopied(true); setTimeout(() => setCredCopied(false), 1500); }}>
+                            {credCopied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             <Table>
-              <TableHeader><TableRow className="hover:bg-transparent"><TableHead>Member</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow className="hover:bg-transparent"><TableHead>Member</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead>{canManage && <TableHead className="text-right">Actions</TableHead>}</TableRow></TableHeader>
               <TableBody>
-                {team.map((m) => (
-                  <TableRow key={m.id}>
-                    <TableCell><div className="flex items-center gap-2.5"><Avatar className="h-8 w-8"><AvatarFallback>{initials(m.name)}</AvatarFallback></Avatar><span className="font-medium">{m.name}</span></div></TableCell>
-                    <TableCell className="text-muted-foreground">{m.email}</TableCell>
+                {team.map((m) => {
+                  const isSelf = m.id === user.id;
+                  const isOwner = m.role === "owner";
+                  return (
+                  <TableRow key={m.id} className={m.active === false ? "opacity-55" : undefined}>
                     <TableCell>
-                      {canManage && m.role !== "owner" ? (
+                      <div className="flex items-center gap-2.5">
+                        <Avatar className="h-8 w-8"><AvatarFallback>{initials(m.name)}</AvatarFallback></Avatar>
+                        <div><div className="font-medium">{m.name}{isSelf && <span className="ml-1.5 text-xs text-muted-foreground">(you)</span>}</div><div className="text-xs text-muted-foreground">{m.email}</div></div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {canManage && !isOwner && !isSelf ? (
                         <Select value={m.role} onValueChange={(v) => changeRole(m.id, v as Role)}>
                           <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                           <SelectContent>{ROLES.filter((r) => r !== "owner").map((r) => <SelectItem key={r} value={r} className="capitalize">{titleCase(r)}</SelectItem>)}</SelectContent>
@@ -142,8 +196,25 @@ export function SettingsView({
                         <Badge variant="muted" className="capitalize">{titleCase(m.role)}</Badge>
                       )}
                     </TableCell>
+                    <TableCell>
+                      {m.active === false
+                        ? <Badge variant="danger">Deactivated</Badge>
+                        : m.auth_id === null
+                          ? <Badge variant="warning">Pending</Badge>
+                          : <Badge variant="success">Active</Badge>}
+                    </TableCell>
+                    {canManage && (
+                      <TableCell className="text-right">
+                        {!isOwner && !isSelf && (
+                          m.active === false
+                            ? <Button variant="outline" size="sm" onClick={() => toggleActive(m.id, true)}><UserCheck className="h-3.5 w-3.5" /> Reactivate</Button>
+                            : <Button variant="outline" size="sm" onClick={() => toggleActive(m.id, false)}><UserX className="h-3.5 w-3.5" /> Deactivate</Button>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>

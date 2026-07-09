@@ -8,6 +8,10 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
   const session = await getSession();
   if (!session) redirect("/login");
 
+  // First-login gate: staff provisioned with a temporary password must set a new
+  // one before they can use the app.
+  if (session.user.must_change_password) redirect("/change-password");
+
   // Route protection: if the role can't access the module for this path, bounce
   // to the dashboard with a message (the pathname is set by middleware).
   const pathname = headers().get("x-pathname") ?? "";
