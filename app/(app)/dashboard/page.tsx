@@ -4,6 +4,7 @@ import { getSession, canWrite } from "@/lib/auth";
 import { getDashboardData, getRecentActivity, getMyTasks } from "@/lib/queries/dashboard";
 import { myAttendance } from "@/lib/queries/copilot-data";
 import { canSeeWidget, canAccessModule } from "@/lib/permissions";
+import { industryConfig } from "@/lib/industry";
 import { AttendanceCard } from "@/components/attendance/attendance-card";
 import { PageHeader } from "@/components/shell/page-header";
 import { LiveKpis, type KpiKey } from "@/components/dashboard/live-kpis";
@@ -46,6 +47,7 @@ const TASK_STATUS: Record<string, "muted" | "primary" | "warning" | "success"> =
 export default async function DashboardPage() {
   const session = (await getSession())!;
   const role = session.user.role;
+  const ind = industryConfig(session.business.industry);
   const show = (w: Parameters<typeof canSeeWidget>[1]) => canSeeWidget(role, w);
 
   // Self-service attendance for staff who clock in (not owner/admin, whose
@@ -72,7 +74,10 @@ export default async function DashboardPage() {
 
   const actions = QUICK_ACTIONS.filter(
     (a) => canAccessModule(role, a.module) && (!("table" in a) || canWrite(role, a.table as string))
-  );
+  ).map((a) => {
+    const override = (ind.actionLabels as Record<string, string>)[a.module];
+    return override ? { ...a, label: override } : a;
+  });
 
   const showChartsRow = show("revenue_chart") || show("health");
   const showInsightsRow = show("insights") || (show("quick_actions") && actions.length > 0);
@@ -86,7 +91,7 @@ export default async function DashboardPage() {
 
       <PageHeader
         title={`Good day, ${session.user.name.split(" ")[0]}`}
-        description="Here's how your business is doing today."
+        description={ind.tagline}
       >
         {canAccessModule(role, "analytics") && (
           <Button asChild variant="outline" size="sm">
@@ -114,6 +119,7 @@ export default async function DashboardPage() {
           <LiveKpis
             visible={kpis}
             currency={session.business.currency}
+            labels={ind.kpiLabels}
             initial={{
               revenueThisMonth: data.revenueThisMonth,
               revenueToday: data.revenueToday,

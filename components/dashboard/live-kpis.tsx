@@ -54,10 +54,12 @@ export function LiveKpis({
   initial,
   visible = ["revenue", "orders", "customers", "outstanding"],
   currency = "INR",
+  labels = {},
 }: {
   initial: Metrics;
   visible?: KpiKey[];
   currency?: string;
+  labels?: Partial<Record<KpiKey, string>>;
 }) {
   const [m, setM] = React.useState(initial);
   const [flash, setFlash] = React.useState<Record<string, boolean>>({});
@@ -131,18 +133,18 @@ export function LiveKpis({
   return (
     <div className={`grid grid-cols-1 gap-4 ${cols}`}>
       {show("revenue") && (
-        <Kpi icon="TrendingUp" label="Revenue this month" value={formatMoney(m.revenueThisMonth, currency)} sub={`${formatMoney(m.revenueToday, currency)} collected today`} flash={!!flash.revenueThisMonth} />
+        <Kpi icon="TrendingUp" label={labels.revenue ?? "Revenue this month"} value={formatMoney(m.revenueThisMonth, currency)} sub={`${formatMoney(m.revenueToday, currency)} collected today`} flash={!!flash.revenueThisMonth} />
       )}
       {show("orders") && (
-        <Kpi icon="ShoppingCart" label="Orders" value={String(m.ordersThisMonth)} sub={`${m.ordersToday} placed today`} flash={!!flash.ordersToday} />
+        <Kpi icon="ShoppingCart" label={labels.orders ?? "Orders"} value={String(m.ordersThisMonth)} sub={`${m.ordersToday} placed today`} flash={!!flash.ordersToday} />
       )}
       {show("customers") && (
-        <Kpi icon="Users" label="Customers" value={String(m.customerCount)} sub="Total in your book" flash={!!flash.customerCount} />
+        <Kpi icon="Users" label={labels.customers ?? "Customers"} value={String(m.customerCount)} sub="Total in your book" flash={!!flash.customerCount} />
       )}
       {show("outstanding") && (
         <Kpi
           icon="ReceiptText"
-          label="Outstanding"
+          label={labels.outstanding ?? "Outstanding"}
           value={formatMoney(m.outstanding, currency)}
           sub="Unpaid & overdue invoices"
           flash={!!flash.outstanding}
