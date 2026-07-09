@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Search, User, Package, Receipt, FolderKanban, FileText, ArrowRight } from "lucide-react";
+import { Search, User, Package, Receipt, FolderKanban, FileText, Users, ArrowRight } from "lucide-react";
 import type { SearchHit } from "@/app/api/search/route";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,7 @@ const ICONS = {
   invoice: Receipt,
   project: FolderKanban,
   document: FileText,
+  employee: Users,
 };
 
 const QUICK = [

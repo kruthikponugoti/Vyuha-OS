@@ -7,12 +7,14 @@
 import { revalidatePath } from "next/cache";
 import { getSession, canWrite } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { byId } from "@/lib/data";
 import type { TableName } from "@/lib/types";
 
 export interface ActionResult {
   ok: boolean;
   error?: string;
   id?: string;
+  deleted?: Record<string, any>;
 }
 
 const LABEL: Partial<Record<TableName, string>> = {
@@ -91,13 +93,38 @@ export async function deleteRecord(
   }
   const db = getDb();
   try {
+    // Capture the row first so the client can offer an undo (re-insert).
+    const snapshot = await byId(table, session.business.id, id);
     const { error } = await db.from(table).delete().eq("id", id).eq("business_id", session.business.id);
     if (error) return { ok: false, error: error.message };
     await logAudit(session, "deleted", table, id, `Deleted ${LABEL[table] ?? table}`);
     if (revalidate) revalidatePath(revalidate);
-    return { ok: true };
+    return { ok: true, deleted: (snapshot as Record<string, any>) ?? undefined };
   } catch (e: any) {
     return { ok: false, error: e?.message ?? "Delete failed." };
+  }
+}
+
+/** Re-insert a row captured by deleteRecord — powers the "Undo" on delete. */
+export async function restoreRecord(
+  table: TableName,
+  row: Record<string, any>,
+  revalidate?: string
+): Promise<ActionResult> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not signed in." };
+  if (!canWrite(session.user.role, table)) {
+    return { ok: false, error: `Your role can't modify ${LABEL[table] ?? table}.` };
+  }
+  const db = getDb();
+  try {
+    const { error } = await db.from(table).insert({ ...row, business_id: session.business.id });
+    if (error) return { ok: false, error: error.message };
+    await logAudit(session, "restored", table, row.id ?? null, `Restored ${LABEL[table] ?? table}`);
+    if (revalidate) revalidatePath(revalidate);
+    return { ok: true, id: row.id };
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? "Restore failed." };
   }
 }
 

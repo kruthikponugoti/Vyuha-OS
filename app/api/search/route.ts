@@ -7,7 +7,7 @@ import { all } from "@/lib/data";
 export const dynamic = "force-dynamic";
 
 export interface SearchHit {
-  type: "customer" | "product" | "invoice" | "project" | "document";
+  type: "customer" | "product" | "invoice" | "project" | "document" | "employee";
   id: string;
   title: string;
   subtitle: string;
@@ -22,12 +22,14 @@ export async function GET(req: Request) {
   if (q.length < 1) return Response.json({ hits: [] });
 
   const bid = session.business.id;
-  const [customers, products, invoices, projects, documents] = await Promise.all([
+  const canSeePeople = ["owner", "admin", "hr", "manager"].includes(session.user.role);
+  const [customers, products, invoices, projects, documents, employees] = await Promise.all([
     all("customers", bid),
     all("products", bid),
     all("invoices", bid),
     all("projects", bid),
     all("documents", bid),
+    canSeePeople ? all("employees", bid) : Promise.resolve([]),
   ]);
 
   const hits: SearchHit[] = [];
@@ -85,6 +87,17 @@ export async function GET(req: Request) {
         title: d.name,
         subtitle: `Document · ${d.type.replace(/_/g, " ")}`,
         href: `/documents`,
+      });
+    }
+  }
+  for (const e of employees) {
+    if (match(e.name) || match(e.designation) || match(e.department) || match(e.email)) {
+      hits.push({
+        type: "employee",
+        id: e.id,
+        title: e.name,
+        subtitle: `${e.designation || "Employee"} · ${e.department}`,
+        href: `/hr`,
       });
     }
   }

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { RecordForm } from "./record-form";
 import { EmptyState } from "@/components/shell/empty-state";
-import { deleteRecord, importRecords } from "@/app/(app)/actions";
+import { deleteRecord, importRecords, restoreRecord } from "@/app/(app)/actions";
 import { exportCsv, parseCsv } from "@/lib/csv";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -58,7 +58,19 @@ export function CrudTable<T extends { id: string }>({
   async function onDelete(id: string) {
     const res = await deleteRecord(table, id, revalidate);
     if (res.ok) {
-      toast.success(`${entityName[0].toUpperCase()}${entityName.slice(1)} deleted.`);
+      const snapshot = res.deleted;
+      toast.success(`${entityName[0].toUpperCase()}${entityName.slice(1)} deleted.`, {
+        action: snapshot
+          ? {
+              label: "Undo",
+              onClick: async () => {
+                const r = await restoreRecord(table, snapshot, revalidate);
+                if (r.ok) { toast.success(`${entityName[0].toUpperCase()}${entityName.slice(1)} restored.`); router.refresh(); }
+                else toast.error(r.error ?? "Couldn't undo.");
+              },
+            }
+          : undefined,
+      });
       router.refresh();
     } else {
       toast.error(res.error ?? "Delete failed.");
