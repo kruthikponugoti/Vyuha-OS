@@ -12,6 +12,9 @@ import {
 } from "@/lib/queries/copilot-data";
 import { getHelp } from "@/lib/copilot/help";
 import { createStaffAccount } from "@/lib/auth-actions";
+import { addExpenseAction } from "@/app/(app)/finance/actions";
+import { decideLeave } from "@/app/(app)/hr/actions";
+import { all } from "@/lib/data";
 import { canUseTool, TOOL_MODULE, MODULE_LABELS, type ModuleKey } from "@/lib/permissions";
 import { formatMoney, titleCase } from "@/lib/utils";
 import { byId } from "@/lib/data";
@@ -54,6 +57,8 @@ export const ACTION_LABELS: Record<string, string> = {
   project_status: "Checked projects",
   get_help: "Answered a question",
   create_staff_account: "Created staff account",
+  add_expense: "Logged expense",
+  decide_leave: "Decided leave request",
 };
 
 // Actions that mutate data — the Copilot confirms before running these.
@@ -65,6 +70,8 @@ export const DESTRUCTIVE = new Set([
   "update_stock",
   "create_customer",
   "create_staff_account",
+  "add_expense",
+  "decide_leave",
 ]);
 
 const itemsSchema = {
@@ -103,6 +110,8 @@ export const FUNCTION_DECLARATIONS = [
   { name: "project_status", description: "Status and task completion of projects.", parameters: { type: "object", properties: {} } },
   { name: "get_help", description: "Answer questions about Vyuha OS itself: what modules exist, what the user's role can do, or how to perform a task.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
   { name: "create_staff_account", description: "Create a staff account for a new team member (owner/admin only). Generates a temporary password unless method is 'invite'.", parameters: { type: "object", properties: { name: { type: "string" }, email: { type: "string" }, role: { type: "string", enum: ["admin", "manager", "finance", "sales", "hr", "employee", "viewer"] }, method: { type: "string", enum: ["temp", "invite"] } }, required: ["name", "email", "role"] } },
+  { name: "add_expense", description: "Log a business expense.", parameters: { type: "object", properties: { description: { type: "string" }, amount: { type: "number" }, category: { type: "string" }, vendor: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD; defaults to today" } }, required: ["description", "amount"] } },
+  { name: "decide_leave", description: "Approve or reject the pending leave request of an employee.", parameters: { type: "object", properties: { employee_name: { type: "string" }, decision: { type: "string", enum: ["approved", "rejected"] } }, required: ["employee_name", "decision"] } },
 ];
 
 /** Tool declarations a role is allowed to call (role-gated for Gemini). */
@@ -252,6 +261,32 @@ export async function runTool(name: string, args: any, ctx: ToolContext): Promis
             : `Account created for ${who}. Temporary password: ${res.tempPassword} — share it; they'll change it on first login.${res.demo ? " (demo simulation)" : ""}`,
           data: { email: args.email, role, temp_password: res.tempPassword, invited: res.invited },
         };
+      }
+      case "add_expense": {
+        const amount = Math.round(Number(args.amount) || 0);
+        if (amount <= 0) return { ok: false, summary: "Tell me the expense amount.", error: "invalid" };
+        const res = await addExpenseAction({
+          description: args.description || "Expense",
+          amount,
+          category: args.category || "General",
+          vendor: args.vendor,
+          date: args.date || new Date().toISOString().slice(0, 10),
+        });
+        if (!res.ok) return { ok: false, summary: res.error ?? "Couldn't log that expense.", error: "failed" };
+        return { ok: true, summary: `Logged a ${money(amount)} expense — ${args.description || "Expense"} (${args.category || "General"}).`, data: { amount, category: args.category || "General" } };
+      }
+      case "decide_leave": {
+        const decision = args.decision === "rejected" ? "rejected" : "approved";
+        const q = String(args.employee_name || "").trim().toLowerCase();
+        if (!q) return { ok: false, summary: "Which employee's leave?", error: "invalid" };
+        const [employees, leaves] = await Promise.all([all("employees", bid), all("leave_requests", bid)]);
+        const emp = (employees as any[]).find((e) => e.name.toLowerCase() === q || e.name.toLowerCase().includes(q) || q.includes(e.name.toLowerCase().split(" ")[0]));
+        if (!emp) return { ok: false, summary: `I couldn't find an employee named “${args.employee_name}”.`, error: "not_found" };
+        const pending = (leaves as any[]).find((l) => l.employee_id === emp.id && l.status === "pending");
+        if (!pending) return { ok: false, summary: `${emp.name} has no pending leave request.`, error: "not_found" };
+        const res = await decideLeave(pending.id, decision);
+        if (!res.ok) return { ok: false, summary: res.error ?? "Couldn't update that request.", error: "failed" };
+        return { ok: true, summary: `${decision === "approved" ? "Approved" : "Rejected"} ${emp.name}'s ${pending.type} leave (${pending.from_date} to ${pending.to_date}).`, data: { employee: emp.name, decision } };
       }
       default:
         return { ok: false, summary: `Unknown action ${name}.`, error: "unknown_tool" };

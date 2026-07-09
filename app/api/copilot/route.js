@@ -177,6 +177,10 @@ function confirmPhrase(tool, args) {
       return `add ${args.name || "this customer"} to your customers`;
     case "create_staff_account":
       return `create a ${args.role || "staff"} account for ${args.name || args.email || "this person"}${args.email ? ` (${args.email})` : ""}`;
+    case "add_expense":
+      return `log a ${args.amount ? "₹" + args.amount : ""} expense for ${args.description || "this"}`;
+    case "decide_leave":
+      return `${args.decision === "rejected" ? "reject" : "approve"} ${args.employee_name || "the employee"}'s leave request`;
     default:
       return "run that action";
   }

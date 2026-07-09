@@ -39,6 +39,16 @@ function parseStaff(message: string) {
   return { name, email, role, method };
 }
 
+function parseExpense(message: string) {
+  const amtM = message.match(/(?:₹|rs\.?|inr)\s*([\d,]+(?:\.\d+)?)|\b([\d,]{2,}(?:\.\d+)?)\b/i);
+  const amount = amtM ? Number((amtM[1] || amtM[2] || "").replace(/,/g, "")) : 0;
+  const descM = message.match(/\b(?:for|on|towards)\s+(.+?)(?:\s*(?:,|\.|$))/i);
+  const description = descM ? descM[1].trim() : "Expense";
+  const catM = message.toLowerCase().match(/\b(rent|salary|salaries|utilities|marketing|supplies|travel|software|maintenance|logistics|misc|office)\b/);
+  const category = catM ? catM[1].replace(/^./, (c) => c.toUpperCase()) : "General";
+  return { description, amount, category };
+}
+
 export function routeLocally(message: string): ParsedIntent {
   const q = message.toLowerCase();
 
@@ -49,6 +59,20 @@ export function routeLocally(message: string): ParsedIntent {
     (/\b(add|create|invite|onboard)\b/.test(q) && /\bas (?:an? )?(admin|manager|finance|sales|hr|employee|viewer)\b/.test(q) && /@/.test(message))
   ) {
     return { tool: "create_staff_account", args: parseStaff(message) };
+  }
+
+  // approve / reject a leave request — "approve Rohit's leave", "reject leave for Priya"
+  if (/\bleave\b/.test(q) && /\b(approve|reject|decline|deny|grant)\b/.test(q)) {
+    const decision = /\b(reject|decline|deny)\b/.test(q) ? "rejected" : "approved";
+    const nameM =
+      message.match(/\b(?:for|of|by)\s+([A-Z][\w'’-]*(?:\s+[A-Z][\w'’-]*)?)/) ||
+      message.match(/\b([A-Z][\w'’-]*(?:\s+[A-Z][\w'’-]*)?)['’]s\s+leave/i);
+    return { tool: "decide_leave", args: { employee_name: nameM ? nameM[1].trim() : "", decision } };
+  }
+
+  // log an expense — "log an expense of 1500 for office supplies", "record ₹800 spent on travel"
+  if ((/\b(log|add|record|enter)\b/.test(q) && /\bexpense\b/.test(q)) || /\bspent\b\s*(?:₹|rs|inr|\d)/.test(q)) {
+    return { tool: "add_expense", args: parseExpense(message) };
   }
 
   // knowledge base (policy / process questions)
