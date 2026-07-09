@@ -80,6 +80,7 @@ create table if not exists leads (
     check (status in ('new','contacted','qualified','converted','lost')),
   owner_id uuid references users(id) on delete set null,
   notes text,
+  follow_up_date date,
   created_at timestamptz not null default now()
 );
 
@@ -327,6 +328,7 @@ create table if not exists tasks (
   due_date date,
   order_index int not null default 0,
   comments jsonb not null default '[]',
+  attachments jsonb not null default '[]',
   created_at timestamptz not null default now()
 );
 

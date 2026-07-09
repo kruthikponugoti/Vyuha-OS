@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { moveTask, addComment } from "@/app/(app)/projects/actions";
+import { moveTask, addComment, addAttachment } from "@/app/(app)/projects/actions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate, timeAgo, cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, MessageSquare, Calendar, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageSquare, Calendar, Send, Paperclip, Download, FileText } from "lucide-react";
 import type { Task, TaskStatus } from "@/lib/types";
+
+function fmtSize(b: number) { return b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`; }
 
 const COLUMNS: { key: TaskStatus; label: string; tone: string }[] = [
   { key: "todo", label: "To do", tone: "bg-ink-300" },
@@ -39,6 +41,32 @@ export function TaskBoard({
   const [active, setActive] = React.useState<Task | null>(null);
   const [comment, setComment] = React.useState("");
   const [posting, setPosting] = React.useState(false);
+  const [attaching, setAttaching] = React.useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  async function onAttach(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f || !active) return;
+    setAttaching(true);
+    try {
+      // Inline small files as data URLs so they're downloadable in demo mode.
+      const data_url = f.size <= 512 * 1024 ? await new Promise<string | null>((res) => {
+        const r = new FileReader();
+        r.onload = () => res(typeof r.result === "string" ? r.result : null);
+        r.onerror = () => res(null);
+        r.readAsDataURL(f);
+      }) : null;
+      const result = await addAttachment(active.id, { name: f.name, size: f.size, type: f.type, data_url });
+      if (result.ok) {
+        toast.success(`Attached ${f.name}.`);
+        setActive(null);
+        router.refresh();
+      } else toast.error(result.error ?? "Couldn't attach that.");
+    } finally {
+      setAttaching(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
 
   async function move(t: Task, dir: -1 | 1) {
     const idx = COLUMNS.findIndex((c) => c.key === t.status);
@@ -89,6 +117,7 @@ export function TaskBoard({
                           <div className="flex items-center gap-2 text-2xs text-muted-foreground">
                             {t.due_date && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDate(t.due_date)}</span>}
                             {t.comments?.length > 0 && <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" />{t.comments.length}</span>}
+                            {t.attachments?.length > 0 && <span className="flex items-center gap-1"><Paperclip className="h-3 w-3" />{t.attachments.length}</span>}
                           </div>
                           {t.assignee_id && memberNames[t.assignee_id] && (
                             <Avatar className="h-5 w-5"><AvatarFallback className="text-[9px]">{initials(memberNames[t.assignee_id])}</AvatarFallback></Avatar>
@@ -150,6 +179,40 @@ export function TaskBoard({
                     <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment…" className="min-h-[40px]" />
                     <Button size="icon" onClick={submitComment} disabled={posting || !comment.trim()} aria-label="Post comment"><Send className="h-4 w-4" /></Button>
                   </div>
+                )}
+              </div>
+
+              <div className="space-y-3 border-t border-border pt-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium">Attachments</h4>
+                  {canWrite && (
+                    <>
+                      <input ref={fileRef} type="file" className="sr-only" onChange={onAttach} />
+                      <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={attaching}>
+                        <Paperclip className="h-3.5 w-3.5" /> {attaching ? "Attaching…" : "Attach file"}
+                      </Button>
+                    </>
+                  )}
+                </div>
+                {active.attachments?.length ? (
+                  <ul className="space-y-1.5">
+                    {active.attachments.map((a, i) => (
+                      <li key={i} className="flex items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2">
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{a.name}</p>
+                          <p className="text-2xs text-muted-foreground">{fmtSize(a.size)} · {a.uploaded_by} · {timeAgo(a.created_at)}</p>
+                        </div>
+                        {a.data_url ? (
+                          <a href={a.data_url} download={a.name} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label={`Download ${a.name}`}><Download className="h-4 w-4" /></a>
+                        ) : (
+                          <span className="shrink-0 text-2xs text-muted-foreground">stored</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No attachments yet.</p>
                 )}
               </div>
             </>

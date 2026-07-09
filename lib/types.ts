@@ -73,6 +73,7 @@ export interface Lead {
   status: LeadStatus;
   owner_id: string | null;
   notes: string | null;
+  follow_up_date: string | null;
   created_at: string;
 }
 
@@ -301,6 +302,15 @@ export interface TaskComment {
   created_at: string;
 }
 
+export interface TaskAttachment {
+  name: string;
+  size: number;
+  type: string;
+  data_url: string | null; // small files are inlined; larger ones store metadata only
+  uploaded_by: string;
+  created_at: string;
+}
+
 export type TaskStatus = "todo" | "in_progress" | "review" | "done";
 
 export interface Task {
@@ -315,6 +325,7 @@ export interface Task {
   due_date: string | null;
   order_index: number;
   comments: TaskComment[];
+  attachments: TaskAttachment[];
   created_at: string;
 }
 

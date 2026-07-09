@@ -212,6 +212,9 @@ export function buildSeedDatabase(now = Date.now()): LocalDatabase {
     status: leadStatuses[i],
     owner_id: USER_IDS.sales,
     notes: null,
+    // Open leads carry a next-contact date (a mix of overdue, today and
+    // upcoming for a realistic follow-up queue); closed leads have none.
+    follow_up_date: ["converted", "lost"].includes(leadStatuses[i]) ? null : ymd(now + (((i % 6) - 2) * 2) * DAY),
     created_at: iso(daysAgo(int(1, 45), int(9, 18))),
   }));
 
@@ -621,6 +624,19 @@ export function buildSeedDatabase(now = Date.now()): LocalDatabase {
               user_name: "Shreya Kulkarni",
               body: "Discussed in Monday standup — on track.",
               created_at: iso(daysAgo(2, 11)),
+            },
+          ]
+        : [],
+    attachments:
+      i % 5 === 0
+        ? [
+            {
+              name: "brief.pdf",
+              size: 148 * 1024,
+              type: "application/pdf",
+              data_url: null,
+              uploaded_by: "Shreya Kulkarni",
+              created_at: iso(daysAgo(4, 15)),
             },
           ]
         : [],

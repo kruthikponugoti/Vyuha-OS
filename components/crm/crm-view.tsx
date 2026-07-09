@@ -5,13 +5,24 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CrudTable } from "@/components/crud/crud-table";
 import { DealPipeline } from "./deal-pipeline";
 import { Badge } from "@/components/ui/badge";
-import { inr } from "@/lib/utils";
+import { inr, formatDate } from "@/lib/utils";
 import type { Customer, Lead, Deal } from "@/lib/types";
 import type { ColumnDef, FieldDef } from "@/components/crud/types";
 
 const LEAD_STATUS: Record<string, "muted" | "primary" | "success" | "warning" | "danger"> = {
   new: "primary", contacted: "warning", qualified: "success", converted: "success", lost: "danger",
 };
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+// A lead's next-contact date, classified for the follow-up queue.
+function followUp(date: string | null): { label: string; tone: "muted" | "primary" | "warning" | "danger"; overdue: boolean } | null {
+  if (!date) return null;
+  const t = todayStr();
+  if (date < t) return { label: `Overdue · ${formatDate(date)}`, tone: "danger", overdue: true };
+  if (date === t) return { label: "Due today", tone: "warning", overdue: true };
+  return { label: formatDate(date), tone: "muted", overdue: false };
+}
 
 const customerColumns: ColumnDef<Customer>[] = [
   { key: "name", header: "Name", render: (r) => (
@@ -50,6 +61,10 @@ const leadColumns: ColumnDef<Lead>[] = [
   { key: "source", header: "Source", render: (r) => <span className="capitalize">{r.source}</span> },
   { key: "email", header: "Contact", render: (r) => <span className="text-sm">{r.email ?? r.phone ?? "—"}</span> },
   { key: "status", header: "Status", render: (r) => <Badge variant={LEAD_STATUS[r.status]} className="capitalize">{r.status}</Badge> },
+  { key: "follow_up_date", header: "Follow-up", render: (r) => {
+    const f = followUp(r.follow_up_date);
+    return f ? <Badge variant={f.tone} className="whitespace-nowrap">{f.label}</Badge> : <span className="text-muted-foreground">—</span>;
+  } },
 ];
 
 const leadFields: FieldDef[] = [
@@ -59,6 +74,7 @@ const leadFields: FieldDef[] = [
   { name: "phone", label: "Phone", type: "tel" },
   { name: "source", label: "Source", type: "select", options: ["walk-in", "website", "instagram", "referral", "exhibition", "other"].map((v) => ({ value: v, label: v })), defaultValue: "website" },
   { name: "status", label: "Status", type: "select", options: ["new", "contacted", "qualified", "converted", "lost"].map((v) => ({ value: v, label: v })), defaultValue: "new" },
+  { name: "follow_up_date", label: "Follow-up date", type: "date", help: "When to next contact this lead." },
 ];
 
 export function CrmView({
@@ -77,11 +93,19 @@ export function CrmView({
     [customers]
   );
 
+  const dueCount = React.useMemo(
+    () => leads.filter((l) => followUp(l.follow_up_date)?.overdue).length,
+    [leads]
+  );
+
   return (
     <Tabs defaultValue="customers" className="p-5 sm:p-8">
       <TabsList>
         <TabsTrigger value="customers">Customers ({customers.length})</TabsTrigger>
-        <TabsTrigger value="leads">Leads ({leads.length})</TabsTrigger>
+        <TabsTrigger value="leads">
+          Leads ({leads.length})
+          {dueCount > 0 && <span className="ml-1.5 rounded-pill bg-warning/15 px-1.5 text-2xs font-semibold text-warning">{dueCount} due</span>}
+        </TabsTrigger>
         <TabsTrigger value="pipeline">Pipeline ({deals.length})</TabsTrigger>
       </TabsList>
 
