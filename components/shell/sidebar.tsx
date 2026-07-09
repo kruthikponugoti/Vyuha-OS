@@ -20,7 +20,7 @@ export function SidebarNav({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const groups = visibleNav(role);
+  const groups = visibleNav(role, industry);
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">

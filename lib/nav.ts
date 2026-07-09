@@ -1,5 +1,6 @@
 import type { Role } from "./types";
 import { canAccessModule, moduleForPath } from "./permissions";
+import { industryConfig } from "./industry";
 
 export interface NavItem {
   href: string;
@@ -50,12 +51,23 @@ export const NAV: NavGroup[] = [
 export const ALL_NAV_ITEMS = NAV.flatMap((g) => g.items);
 
 // Only render nav items whose module the role may access (permissions.ts).
-export function visibleNav(role: Role): NavGroup[] {
+// Labels adapt to the business industry where it overrides the default term
+// (e.g. Inventory → "Pharmacy", CRM → "Patients"); otherwise stay as-is.
+export function visibleNav(role: Role, industry?: string): NavGroup[] {
+  const cfg = industry ? industryConfig(industry) : null;
+  const relabel = (item: NavItem): NavItem => {
+    if (!cfg) return item;
+    if (item.href === "/crm" && cfg.terms.customers !== "Customers") return { ...item, label: cfg.terms.customers };
+    if (item.href === "/inventory" && cfg.terms.inventory !== "Inventory") return { ...item, label: cfg.terms.inventory };
+    return item;
+  };
   return NAV.map((g) => ({
     ...g,
-    items: g.items.filter((i) => {
-      const module = moduleForPath(i.href);
-      return module ? canAccessModule(role, module) : true;
-    }),
+    items: g.items
+      .filter((i) => {
+        const module = moduleForPath(i.href);
+        return module ? canAccessModule(role, module) : true;
+      })
+      .map(relabel),
   })).filter((g) => g.items.length > 0);
 }

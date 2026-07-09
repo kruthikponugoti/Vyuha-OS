@@ -43,7 +43,6 @@ export function SettingsView({
   const [cred, setCred] = React.useState<{ email: string; tempPassword?: string; invited?: boolean; demo?: boolean } | null>(null);
   const [credCopied, setCredCopied] = React.useState(false);
   const [notifPrefs, setNotifPrefs] = React.useState({ lowStock: true, overdue: true, newOrders: true, weekly: false });
-  const [copied, setCopied] = React.useState(false);
   const canManage = ["owner", "admin"].includes(user.role);
 
   async function saveBiz() {
@@ -251,14 +250,9 @@ export function SettingsView({
             <CardFooter><Button disabled={demo}>Update password</Button></CardFooter>
           </Card>
           <Card>
-            <CardHeader><CardTitle>API keys</CardTitle><CardDescription>Use these to integrate Vyuha OS with your own tools.</CardDescription></CardHeader>
+            <CardHeader><CardTitle>API keys</CardTitle><CardDescription>Programmatic access for your own integrations.</CardDescription></CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 rounded-md border border-border bg-secondary/40 p-2.5">
-                <code className="flex-1 truncate font-mono text-xs">vyu_live_••••••••••••••••••••••3f9a</code>
-                <Button variant="ghost" size="icon-sm" onClick={() => { navigator.clipboard?.writeText("vyu_live_demo_key"); setCopied(true); setTimeout(() => setCopied(false), 1500); toast.success("Copied."); }} aria-label="Copy API key">
-                  {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
+              <p className="text-sm text-muted-foreground">API access isn&apos;t available yet in this build. When it ships, you&apos;ll generate and manage keys here.</p>
             </CardContent>
           </Card>
         </div>
