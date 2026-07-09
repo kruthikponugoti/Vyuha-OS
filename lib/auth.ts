@@ -56,6 +56,8 @@ export async function getSession(): Promise<Session | null> {
         email: "build@vyuhaos.in",
         role: "owner",
         avatar_url: null,
+        active: true,
+        must_change_password: false,
         created_at: new Date().toISOString(),
       },
       business: {

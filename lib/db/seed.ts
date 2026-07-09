@@ -81,6 +81,8 @@ export function buildSeedDatabase(now = Date.now()): LocalDatabase {
     email,
     role,
     avatar_url: null,
+    active: true,
+    must_change_password: false,
     created_at: iso(daysAgo(380 - i * 5)),
   }));
 

@@ -30,6 +30,8 @@ create table if not exists users (
   role text not null default 'viewer'
     check (role in ('owner','admin','manager','finance','sales','hr','employee','viewer')),
   avatar_url text,
+  active boolean not null default true,
+  must_change_password boolean not null default false,
   created_at timestamptz not null default now()
 );
 create index if not exists users_business_idx on users(business_id);

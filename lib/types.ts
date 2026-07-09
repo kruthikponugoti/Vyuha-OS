@@ -41,6 +41,8 @@ export interface User {
   email: string;
   role: Role;
   avatar_url: string | null;
+  active: boolean;
+  must_change_password: boolean;
   created_at: string;
 }
 

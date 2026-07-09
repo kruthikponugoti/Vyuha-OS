@@ -36,11 +36,11 @@ export function DemoRolePicker() {
     <div className="rounded-card border border-border bg-secondary/40 p-4">
       <div className="flex items-center gap-2 text-sm font-medium">
         <Sparkles className="h-4 w-4 text-primary" />
-        Explore in demo mode
+        Explore with sample data
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        No account needed. Pick a role to see exactly what that person can and cannot do — access is
-        enforced, not simulated.
+        An isolated sandbox — nothing here touches a real business. Pick a role to see exactly what
+        that person can and cannot do; access is enforced, not simulated.
       </p>
       <div className="mt-3 flex gap-2">
         <Select value={role} onValueChange={(v) => setRole(v as Role)}>
