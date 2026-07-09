@@ -249,7 +249,7 @@ export async function createStaffAccount(input: {
   let tempPassword: string | undefined;
   if (input.method === "invite") {
     const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${siteUrl()}/set-password`,
+      redirectTo: `${siteUrl()}/reset-password`,
       data: { full_name: name },
     });
     if (error) return { ok: false, error: error.message };
