@@ -29,8 +29,27 @@ function parseCustomerAndItems(message: string): { customer_name: string; items:
   return { customer_name, items };
 }
 
+function parseStaff(message: string) {
+  const email = (message.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/) || [])[0] || "";
+  const roleM = message.toLowerCase().match(/\bas (?:an?\s+)?(admin|manager|finance|sales|hr|employee|viewer)\b/);
+  const role = roleM ? roleM[1] : "employee";
+  const namedM = message.match(/\b(?:named|called|member|staffer)\s+([A-Z][\w'’-]*(?:\s+[A-Z][\w'’-]*){0,2})/);
+  const name = namedM ? namedM[1].trim() : (email ? email.split("@")[0] : "");
+  const method = /\binvite|link|send (an? )?invit/i.test(message) ? "invite" : "temp";
+  return { name, email, role, method };
+}
+
 export function routeLocally(message: string): ParsedIntent {
   const q = message.toLowerCase();
+
+  // staff account provisioning (owner/admin) — "add a staff member named Priya
+  // as HR with email priya@x.com"
+  if (
+    (/\b(staff|team member|team-member|staffer|teammate)\b/.test(q) && /\b(add|create|invite|onboard|new|set up)\b/.test(q)) ||
+    (/\b(add|create|invite|onboard)\b/.test(q) && /\bas (?:an? )?(admin|manager|finance|sales|hr|employee|viewer)\b/.test(q) && /@/.test(message))
+  ) {
+    return { tool: "create_staff_account", args: parseStaff(message) };
+  }
 
   // knowledge base (policy / process questions)
   if (/\b(policy|return|refund|warranty|guarantee|handbook|operating hours|store hours|delivery (fee|charge)|emi|onboard|gstin|net 30|payment terms)\b/.test(q) || /^(what is|what'?s|how do we|how does|can (a )?customer|are we|do we) .*(policy|return|refund|warranty|deliver|hours|emi|open)/.test(q)) {

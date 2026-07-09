@@ -135,6 +135,8 @@ export const COPILOT_TOOLS: Record<string, Role[]> = {
   my_attendance: ["owner", "admin", "manager", "finance", "sales", "hr", "employee"],
   // Projects
   project_status: ["owner", "admin", "manager", "employee"],
+  // Team administration (sensitive — owner/admin only)
+  create_staff_account: ["owner", "admin"],
   // Universal (read-only, non-sensitive)
   search_knowledge: ["owner", "admin", "manager", "finance", "sales", "hr", "employee"],
   get_help: ["owner", "admin", "manager", "finance", "sales", "hr", "employee", "viewer"],
@@ -148,7 +150,7 @@ export const TOOL_MODULE: Record<string, ModuleKey> = {
   send_payment_reminder: "finance", create_customer: "crm", search_customers: "crm",
   check_stock: "inventory", update_stock: "inventory", create_order: "crm",
   attendance_today: "hr", employee_leave: "hr", payroll_summary: "hr", my_attendance: "hr",
-  project_status: "projects",
+  project_status: "projects", create_staff_account: "settings",
 };
 
 export function canUseTool(role: Role, tool: string): boolean {

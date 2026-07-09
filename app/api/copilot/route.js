@@ -175,6 +175,8 @@ function confirmPhrase(tool, args) {
       return `adjust stock of ${args.product_name} by ${args.qty}`;
     case "create_customer":
       return `add ${args.name || "this customer"} to your customers`;
+    case "create_staff_account":
+      return `create a ${args.role || "staff"} account for ${args.name || args.email || "this person"}${args.email ? ` (${args.email})` : ""}`;
     default:
       return "run that action";
   }

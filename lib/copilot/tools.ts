@@ -11,6 +11,7 @@ import {
   listUnpaidInvoices, expenseSummary, attendanceToday, employeeLeave, myAttendance, projectStatus, payrollSummary,
 } from "@/lib/queries/copilot-data";
 import { getHelp } from "@/lib/copilot/help";
+import { createStaffAccount } from "@/lib/auth-actions";
 import { canUseTool, TOOL_MODULE, MODULE_LABELS, type ModuleKey } from "@/lib/permissions";
 import { formatMoney, titleCase } from "@/lib/utils";
 import { byId } from "@/lib/data";
@@ -52,6 +53,7 @@ export const ACTION_LABELS: Record<string, string> = {
   my_attendance: "Checked your attendance",
   project_status: "Checked projects",
   get_help: "Answered a question",
+  create_staff_account: "Created staff account",
 };
 
 // Actions that mutate data — the Copilot confirms before running these.
@@ -62,6 +64,7 @@ export const DESTRUCTIVE = new Set([
   "create_order",
   "update_stock",
   "create_customer",
+  "create_staff_account",
 ]);
 
 const itemsSchema = {
@@ -99,6 +102,7 @@ export const FUNCTION_DECLARATIONS = [
   { name: "my_attendance", description: "The asking user's own attendance this month and leave balance.", parameters: { type: "object", properties: {} } },
   { name: "project_status", description: "Status and task completion of projects.", parameters: { type: "object", properties: {} } },
   { name: "get_help", description: "Answer questions about Vyuha OS itself: what modules exist, what the user's role can do, or how to perform a task.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
+  { name: "create_staff_account", description: "Create a staff account for a new team member (owner/admin only). Generates a temporary password unless method is 'invite'.", parameters: { type: "object", properties: { name: { type: "string" }, email: { type: "string" }, role: { type: "string", enum: ["admin", "manager", "finance", "sales", "hr", "employee", "viewer"] }, method: { type: "string", enum: ["temp", "invite"] } }, required: ["name", "email", "role"] } },
 ];
 
 /** Tool declarations a role is allowed to call (role-gated for Gemini). */
@@ -234,6 +238,20 @@ export async function runTool(name: string, args: any, ctx: ToolContext): Promis
       case "get_help": {
         const r = getHelp(actor.role, args.query || "");
         return { ok: true, summary: r.answer, data: { help: true } };
+      }
+      case "create_staff_account": {
+        const role = String(args.role || "employee").toLowerCase();
+        const method = args.method === "invite" ? "invite" : "temp";
+        const res = await createStaffAccount({ name: args.name, email: args.email, role: role as import("@/lib/types").Role, method });
+        if (!res.ok) return { ok: false, summary: res.error ?? "Couldn't create that account.", error: "failed" };
+        const who = `${args.name} as ${titleCase(role)}`;
+        return {
+          ok: true,
+          summary: res.invited
+            ? `Invite emailed to ${args.email} — ${who} will set their own password from the link.${res.demo ? " (demo — no email actually sent)" : ""}`
+            : `Account created for ${who}. Temporary password: ${res.tempPassword} — share it; they'll change it on first login.${res.demo ? " (demo simulation)" : ""}`,
+          data: { email: args.email, role, temp_password: res.tempPassword, invited: res.invited },
+        };
       }
       default:
         return { ok: false, summary: `Unknown action ${name}.`, error: "unknown_tool" };
