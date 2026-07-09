@@ -99,6 +99,7 @@ export function InventoryView({
           searchKeys={["name", "sku", "barcode"]}
           filters={[{ key: "category_id", label: "Category", options: categories.map((c) => ({ value: c.id, label: c.name })) }]}
           entityName="product" revalidate="/inventory" canWrite={canWrite} exportName="products"
+          rowHref={(r) => `/inventory/products/${r.id}`}
           serialize={(v) => ({ ...v, price: Number(v.price) || 0, cost: Number(v.cost) || 0, stock_qty: Math.round(Number(v.stock_qty) || 0), low_stock_threshold: Math.round(Number(v.low_stock_threshold) || 5) })}
         />
       </TabsContent>

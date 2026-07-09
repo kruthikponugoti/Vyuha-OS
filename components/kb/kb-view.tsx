@@ -24,7 +24,37 @@ export function KbView({ files, canWrite }: { files: KnowledgeBaseFile[]; canWri
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [name, setName] = React.useState("");
   const [text, setText] = React.useState("");
+  const [mime, setMime] = React.useState<string | undefined>(undefined);
+  const [size, setSize] = React.useState<number | undefined>(undefined);
+  const [note, setNote] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  // Text-based formats we can extract content from directly in the browser.
+  const isTextual = (f: File) =>
+    /^text\//.test(f.type) ||
+    /(json|csv|xml|html?|markdown|yaml)/.test(f.type) ||
+    /\.(txt|md|markdown|csv|tsv|json|log|html?|xml|yml|yaml|rtf)$/i.test(f.name);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setName(f.name);
+    setMime(f.type || "application/octet-stream");
+    setSize(f.size);
+    if (isTextual(f)) {
+      try {
+        const content = await f.text();
+        setText(content);
+        setNote(`Extracted ${content.length.toLocaleString()} characters from ${f.name}.`);
+      } catch {
+        setNote("Couldn't read that file — paste the text below.");
+      }
+    } else {
+      setText("");
+      setNote(`${f.name} isn't a text format we can auto-extract — paste or type its content below.`);
+    }
+  }
 
   async function ask(e: React.FormEvent) {
     e.preventDefault();
@@ -36,13 +66,18 @@ export function KbView({ files, canWrite }: { files: KnowledgeBaseFile[]; canWri
     else toast.error("Search failed.");
   }
 
+  function resetUpload() {
+    setName(""); setText(""); setMime(undefined); setSize(undefined); setNote(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
   async function upload() {
     setSaving(true);
-    const res = await addKnowledgeFile({ name, text });
+    const res = await addKnowledgeFile({ name, text, mime, size });
     setSaving(false);
     if (res.ok) {
       toast.success("Document added to the knowledge base.");
-      setUploadOpen(false); setName(""); setText("");
+      setUploadOpen(false); resetUpload();
       router.refresh();
     } else toast.error(res.error ?? "Upload failed.");
   }
@@ -86,23 +121,46 @@ export function KbView({ files, canWrite }: { files: KnowledgeBaseFile[]; canWri
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <div><CardTitle>Knowledge base</CardTitle><CardDescription>{files.length} documents · used by the Copilot to answer questions</CardDescription></div>
           {canWrite && (
-            <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+            <Dialog open={uploadOpen} onOpenChange={(o) => { setUploadOpen(o); if (!o) resetUpload(); }}>
               <DialogTrigger asChild><Button size="sm"><Upload className="h-4 w-4" /> Add document</Button></DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Add a document</DialogTitle></DialogHeader>
                 <div className="space-y-3">
                   <div>
+                    <Label className="mb-1.5 block">File</Label>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept=".txt,.md,.markdown,.csv,.tsv,.json,.log,.html,.htm,.xml,.yml,.yaml,.rtf,.pdf,.doc,.docx"
+                      onChange={onFile}
+                      className="sr-only"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="flex w-full items-center gap-3 rounded-card border border-dashed border-border bg-background px-4 py-4 text-left text-sm hover:border-primary/50 hover:bg-accent/40"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground"><Upload className="h-4 w-4" /></span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{name || "Choose a file to upload"}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {size != null ? `${(size / 1024).toFixed(0)} KB · ${mime || "file"}` : "TXT, MD, CSV, JSON, HTML — text is extracted automatically"}
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                  <div>
                     <Label htmlFor="kb-name" className="mb-1.5 block">Document name</Label>
-                    <Input id="kb-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Delivery Policy.pdf" />
+                    <Input id="kb-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Delivery Policy" />
                   </div>
                   <div>
                     <Label htmlFor="kb-text" className="mb-1.5 block">Content</Label>
                     <Textarea id="kb-text" value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste the document text…" className="min-h-[140px]" />
-                    <p className="mt-1 text-xs text-muted-foreground">In demo mode, paste text directly. With Supabase Storage connected, you&apos;d upload a PDF/DOCX and text is extracted automatically.</p>
+                    {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setUploadOpen(false)}>Cancel</Button>
+                  <Button variant="outline" onClick={() => { setUploadOpen(false); resetUpload(); }}>Cancel</Button>
                   <Button onClick={upload} disabled={saving || !name.trim() || !text.trim()}>{saving ? "Adding…" : "Add document"}</Button>
                 </DialogFooter>
               </DialogContent>

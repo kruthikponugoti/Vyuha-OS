@@ -5,10 +5,11 @@ import { getSession, canWrite } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { searchKnowledge } from "@/lib/queries/knowledge";
 
-// Demo mode stores pasted text as the "extracted" content. With Supabase
-// Storage configured, this is where the file upload + text extraction +
-// embedding would run; the copilot search contract is unchanged.
-export async function addKnowledgeFile(input: { name: string; text: string; mime?: string }) {
+// The client reads the picked file and extracts its text before calling this;
+// `size` is the file's real byte length. With Supabase Storage configured, the
+// original file would also be uploaded and `file_url` set — the copilot search
+// contract (extracted_text) is unchanged.
+export async function addKnowledgeFile(input: { name: string; text: string; mime?: string; size?: number }) {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
   if (!canWrite(session.user.role, "knowledge_base_files")) return { ok: false, error: "Your role can't add documents." };
@@ -19,7 +20,7 @@ export async function addKnowledgeFile(input: { name: string; text: string; mime
     name: input.name.trim(),
     file_url: null,
     mime_type: input.mime ?? "text/plain",
-    size_bytes: input.text.length,
+    size_bytes: input.size && input.size > 0 ? input.size : input.text.length,
     extracted_text: input.text.trim(),
     status: "ready",
   });
