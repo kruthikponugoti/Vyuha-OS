@@ -484,6 +484,56 @@ begin
   end loop;
 end $$;
 
+-- ---------------------------------------------------------------------------
+-- Self-service overrides for the HR flows. The generated policies above give
+-- attendance/leave writes to HR roles only; these refine them so an employee
+-- can clock in/out and submit leave for THEIR OWN record — without being able
+-- to touch anyone else's or approve their own leave.
+-- ---------------------------------------------------------------------------
+
+create or replace function app_user_id() returns uuid
+language sql stable security definer set search_path = public as
+$$ select id from users where auth_id = auth.uid() limit 1 $$;
+
+create or replace function owns_employee(emp uuid) returns boolean
+language sql stable security definer set search_path = public as
+$$ select exists (select 1 from employees e where e.id = emp and e.user_id = app_user_id()) $$;
+
+-- employees: owner/admin/hr read all; a user may also read their OWN record so
+-- self-service can resolve it. Other people's salaries stay hidden.
+drop policy if exists employees_read on employees;
+create policy employees_read on employees for select
+  using (business_id = app_business_id()
+    and (has_role(array['owner','admin','hr']) or user_id = app_user_id()));
+
+-- attendance: owner/admin/hr manage anyone; an employee may write their own row.
+drop policy if exists attendance_insert on attendance;
+create policy attendance_insert on attendance for insert
+  with check (business_id = app_business_id()
+    and (has_role(array['owner','admin','hr']) or owns_employee(employee_id)));
+
+drop policy if exists attendance_update on attendance;
+create policy attendance_update on attendance for update
+  using (business_id = app_business_id()
+    and (has_role(array['owner','admin','hr']) or owns_employee(employee_id)))
+  with check (business_id = app_business_id());
+
+-- leave_requests: an employee may submit their own; only owner/admin/hr/manager
+-- may decide (update) or delete — so no one approves their own leave.
+drop policy if exists leave_requests_insert on leave_requests;
+create policy leave_requests_insert on leave_requests for insert
+  with check (business_id = app_business_id()
+    and (has_role(array['owner','admin','hr','manager']) or owns_employee(employee_id)));
+
+drop policy if exists leave_requests_update on leave_requests;
+create policy leave_requests_update on leave_requests for update
+  using (business_id = app_business_id() and has_role(array['owner','admin','hr','manager']))
+  with check (business_id = app_business_id());
+
+drop policy if exists leave_requests_delete on leave_requests;
+create policy leave_requests_delete on leave_requests for delete
+  using (business_id = app_business_id() and has_role(array['owner','admin','hr','manager']));
+
 -- Atomic stock decrement that refuses oversell
 create or replace function decrement_stock(p_id uuid, p_qty int) returns int
 language plpgsql as $$
