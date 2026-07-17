@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { clockInOut, requestLeave } from "@/app/(app)/hr/actions";
+import { useRealtimeRefresh } from "@/components/hooks/use-realtime";
 import { titleCase, cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Clock, LogIn, LogOut, CalendarPlus } from "lucide-react";
@@ -31,6 +32,9 @@ const STATUS_TONE: Record<string, "success" | "warning" | "danger" | "muted" | "
 
 export function AttendanceCard({ data }: { data: MyAttendance }) {
   const router = useRouter();
+  // Keep the employee's own attendance/leave live: when HR approves or rejects
+  // their request (or marks attendance), this card refreshes without a reload.
+  useRealtimeRefresh(["leave_requests", "attendance", "payroll"]);
   const [pending, start] = React.useTransition();
   const [leaveOpen, setLeaveOpen] = React.useState(false);
   const onLeave = data.today === "leave";
