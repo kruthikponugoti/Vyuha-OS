@@ -43,6 +43,23 @@ async function logAudit(
   });
 }
 
+// Server-side field validation — mirrors the form so the API can't be bypassed.
+function validateRecord(table: TableName, v: Record<string, any>): string | null {
+  if (table === "employees") {
+    const email = String(v.email ?? "").trim();
+    const phone = String(v.phone ?? "").trim();
+    const notes = String(v.performance_notes ?? "").trim();
+    if (!email) return "Email is required.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address.";
+    if (!phone) return "Phone number is required.";
+    let digits = phone.replace(/\D/g, "");
+    if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2); // strip +91
+    if (!/^\d{10}$/.test(digits)) return "Phone number must be exactly 10 digits.";
+    if (!notes) return "Performance notes are required.";
+  }
+  return null;
+}
+
 export async function saveRecord(
   table: TableName,
   values: Record<string, any>,
@@ -53,6 +70,8 @@ export async function saveRecord(
   if (!canWrite(session.user.role, table)) {
     return { ok: false, error: `Your role can't modify ${LABEL[table] ?? table}.` };
   }
+  const invalid = validateRecord(table, values);
+  if (invalid) return { ok: false, error: invalid };
   const db = getDb();
   const isUpdate = Boolean(values.id);
   const label = LABEL[table] ?? table;

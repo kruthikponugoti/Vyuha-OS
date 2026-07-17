@@ -10,6 +10,11 @@ export interface FieldDef {
   defaultValue?: string | number;
   full?: boolean; // span both columns
   help?: string;
+  /** Fixed prefix shown before the input and stored with the value (e.g. "+91"). */
+  prefix?: string;
+  /** Per-field validator; returns an error message, or null when valid. */
+  validate?: (value: string) => string | null;
+  maxLength?: number;
 }
 
 export interface ColumnDef<T> {

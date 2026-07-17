@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { saveRecord } from "@/app/(app)/actions";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import type { FieldDef } from "./types";
 import type { TableName } from "@/lib/types";
 
@@ -34,29 +35,57 @@ export function RecordForm({
   onSaved?: () => void;
 }) {
   const [values, setValues] = React.useState<Record<string, any>>({});
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
     const init: Record<string, any> = {};
     for (const f of fields) {
-      init[f.name] = editing?.[f.name] ?? f.defaultValue ?? "";
+      let v = editing?.[f.name] ?? f.defaultValue ?? "";
+      // Show a prefixed field (e.g. phone "+91…") without its prefix in the input.
+      if (f.prefix && typeof v === "string" && v.startsWith(f.prefix)) v = v.slice(f.prefix.length);
+      init[f.name] = v;
     }
     setValues(init);
+    setErrors({});
   }, [open, editing, fields]);
 
-  const set = (name: string, v: any) => setValues((p) => ({ ...p, [name]: v }));
+  const set = (name: string, v: any) => {
+    setValues((p) => ({ ...p, [name]: v }));
+    setErrors((p) => (p[name] ? { ...p, [name]: "" } : p));
+  };
+
+  function fieldError(f: FieldDef, raw: any): string | null {
+    const v = String(raw ?? "").trim();
+    if (f.required && !v) return `${f.label} is required.`;
+    if (v && f.validate) return f.validate(v);
+    return null;
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const errs: Record<string, string> = {};
     for (const f of fields) {
-      if (f.required && !String(values[f.name] ?? "").trim()) {
-        toast.error(`${f.label} is required.`);
-        return;
-      }
+      const err = fieldError(f, values[f.name]);
+      if (err) errs[f.name] = err;
     }
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      toast.error("Please fix the highlighted fields.");
+      return;
+    }
+    setErrors({});
+
+    // Re-apply fixed prefixes (e.g. +91) before saving.
+    const applied: Record<string, any> = { ...values };
+    for (const f of fields) {
+      const v = String(applied[f.name] ?? "").trim();
+      if (f.prefix && v) applied[f.name] = f.prefix + v.replace(/\D/g, "");
+    }
+
     setSaving(true);
-    const payload = serialize ? serialize(values) : values;
+    const payload = serialize ? serialize(applied) : applied;
     if (editing?.id) payload.id = editing.id;
     const res = await saveRecord(table, payload, revalidate);
     setSaving(false);
@@ -77,7 +106,7 @@ export function RecordForm({
             {editing ? "Edit" : "New"} {entityName}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <form onSubmit={submit} noValidate className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {fields.map((f) => (
             <div key={f.name} className={f.full || f.type === "textarea" ? "sm:col-span-2" : ""}>
               <Label htmlFor={f.name} className="mb-1.5 block">
@@ -85,10 +114,10 @@ export function RecordForm({
                 {f.required && <span className="ml-0.5 text-destructive">*</span>}
               </Label>
               {f.type === "textarea" ? (
-                <Textarea id={f.name} value={values[f.name] ?? ""} onChange={(e) => set(f.name, e.target.value)} placeholder={f.placeholder} />
+                <Textarea id={f.name} value={values[f.name] ?? ""} onChange={(e) => set(f.name, e.target.value)} placeholder={f.placeholder} className={cn(errors[f.name] && "border-destructive focus-visible:ring-destructive")} />
               ) : f.type === "select" ? (
                 <Select value={String(values[f.name] ?? "")} onValueChange={(v) => set(f.name, v)}>
-                  <SelectTrigger id={f.name}>
+                  <SelectTrigger id={f.name} className={cn(errors[f.name] && "border-destructive")}>
                     <SelectValue placeholder="Select…" />
                   </SelectTrigger>
                   <SelectContent>
@@ -98,15 +127,29 @@ export function RecordForm({
                   </SelectContent>
                 </Select>
               ) : (
-                <Input
-                  id={f.name}
-                  type={f.type ?? "text"}
-                  value={values[f.name] ?? ""}
-                  onChange={(e) => set(f.name, f.type === "number" ? e.target.value : e.target.value)}
-                  placeholder={f.placeholder}
-                />
+                <div className="flex">
+                  {f.prefix && (
+                    <span className="inline-flex select-none items-center rounded-l-md border border-r-0 border-input bg-secondary px-3 text-sm text-muted-foreground">{f.prefix}</span>
+                  )}
+                  <Input
+                    id={f.name}
+                    type={f.type === "tel" ? "text" : f.type ?? "text"}
+                    inputMode={f.type === "tel" ? "numeric" : undefined}
+                    maxLength={f.maxLength}
+                    value={values[f.name] ?? ""}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (f.type === "tel") val = val.replace(/\D/g, "").slice(0, f.maxLength ?? 10);
+                      set(f.name, val);
+                    }}
+                    placeholder={f.placeholder}
+                    className={cn(f.prefix && "rounded-l-none", errors[f.name] && "border-destructive focus-visible:ring-destructive")}
+                  />
+                </div>
               )}
-              {f.help && <p className="mt-1 text-xs text-muted-foreground">{f.help}</p>}
+              {errors[f.name]
+                ? <p className="mt-1 text-xs text-destructive">{errors[f.name]}</p>
+                : f.help && <p className="mt-1 text-xs text-muted-foreground">{f.help}</p>}
             </div>
           ))}
           <DialogFooter className="sm:col-span-2">

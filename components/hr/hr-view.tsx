@@ -48,7 +48,12 @@ export function HrView({
       </div>
     ) },
     { key: "department", header: "Department", render: (r) => <Badge variant="muted">{r.department}</Badge> },
-    { key: "email", header: "Contact", render: (r) => <span className="text-sm">{r.email ?? r.phone ?? "—"}</span> },
+    { key: "email", header: "Contact", render: (r) => (
+      <div className="text-sm">
+        <div>{r.email ?? "—"}</div>
+        {r.phone && <div className="num text-xs text-muted-foreground">{r.phone}</div>}
+      </div>
+    ) },
     { key: "salary", header: "Salary", className: "text-right", render: (r) => <span className="num">{inr(r.salary)}/mo</span> },
     { key: "status", header: "Status", render: (r) => <Badge variant={r.status === "active" ? "success" : r.status === "on_leave" ? "warning" : "muted"}>{titleCase(r.status)}</Badge> },
   ];
@@ -56,12 +61,12 @@ export function HrView({
     { name: "name", label: "Full name", required: true, full: true },
     { name: "designation", label: "Designation", required: true },
     { name: "department", label: "Department", type: "select", options: ["Operations", "Finance", "Sales", "HR", "Support", "General"].map((v) => ({ value: v, label: v })), defaultValue: "Operations" },
-    { name: "email", label: "Email", type: "email" },
-    { name: "phone", label: "Phone", type: "tel" },
+    { name: "email", label: "Email", type: "email", required: true, validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : "Enter a valid email address." },
+    { name: "phone", label: "Phone", type: "tel", required: true, prefix: "+91", maxLength: 10, placeholder: "10-digit number", validate: (v) => /^\d{10}$/.test(v.replace(/\D/g, "")) ? null : "Enter exactly 10 digits." },
     { name: "salary", label: "Monthly salary (₹)", type: "number", required: true },
     { name: "join_date", label: "Join date", type: "date" },
     { name: "status", label: "Status", type: "select", options: ["active", "on_leave", "exited"].map((v) => ({ value: v, label: titleCase(v) })), defaultValue: "active" },
-    { name: "performance_notes", label: "Performance notes", type: "textarea", full: true },
+    { name: "performance_notes", label: "Performance notes", type: "textarea", full: true, required: true },
   ];
 
   // ---- attendance derived data ----
