@@ -39,7 +39,13 @@ export async function middleware(req: NextRequest) {
 
   // Hybrid: a demo session (role-picker cookie) is authenticated regardless of
   // whether Supabase is configured — check it first so demo and real coexist.
-  const demoAuthed = Boolean(req.cookies.get("vyuha-demo-auth"));
+  // A real Supabase session cookie ALWAYS wins over a demo cookie (mirrors
+  // isDemoRequest() in lib/db), so the two auth-decision points can't disagree
+  // and cause a /login↔/dashboard redirect loop.
+  const hasRealSessionCookie = req.cookies
+    .getAll()
+    .some((c) => /^sb-.+-auth-token(\.\d+)?$/.test(c.name) && Boolean(c.value));
+  const demoAuthed = Boolean(req.cookies.get("vyuha-demo-auth")) && !hasRealSessionCookie;
   if (demoAuthed) {
     if (isAuthPage) {
       const to = req.nextUrl.clone();
