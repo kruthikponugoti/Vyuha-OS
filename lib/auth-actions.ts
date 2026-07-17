@@ -31,19 +31,31 @@ export async function demoSignIn(role: Role = "owner") {
 }
 
 export async function switchDemoRole(role: Role) {
+  // Server-side enforcement: role switching is a DEMO-ONLY affordance. A real
+  // authenticated session must never be able to change its own role this way.
+  if (!isDemoRequest()) return { ok: false, error: "Role is fixed by your administrator." };
   const r: Role = ROLES.includes(role) ? role : "owner";
   cookies().set(DEMO_ROLE_COOKIE, r, { path: "/", maxAge: YEAR, sameSite: "lax" });
   revalidatePath("/", "layout");
+  return { ok: true };
 }
 
+/**
+ * Clears every server-side trace of the session — both demo cookies and the
+ * real Supabase session. Does NOT redirect: the client sign-out flow also
+ * clears client storage and then hard-navigates, guaranteeing no cached
+ * identity/role survives into the next login.
+ */
 export async function signOut() {
-  // Demo session → drop the demo cookie. Real session → sign out of Supabase.
-  if (isDemoRequest()) {
-    cookies().delete(DEMO_AUTH_COOKIE);
-  } else {
+  cookies().delete(DEMO_AUTH_COOKIE);
+  cookies().delete(DEMO_ROLE_COOKIE);
+  try {
     await supabaseServer().auth.signOut();
+  } catch {
+    // no real session — that's fine
   }
-  redirect("/login");
+  revalidatePath("/", "layout");
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +78,11 @@ export async function signInWithPassword(
   const supabase = supabaseServer();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: error.message };
-  cookies().delete(DEMO_AUTH_COOKIE); // leave any demo session behind
+  // Leave no demo session behind, and bust the client router cache so the
+  // previous user's server-rendered content can't be reused.
+  cookies().delete(DEMO_AUTH_COOKIE);
+  cookies().delete(DEMO_ROLE_COOKIE);
+  revalidatePath("/", "layout");
   redirect("/dashboard");
 }
 
@@ -97,7 +113,9 @@ export async function signUp(
     }
     return { error: msg };
   }
-  cookies().delete(DEMO_AUTH_COOKIE); // leave any demo session behind
+  cookies().delete(DEMO_AUTH_COOKIE);
+  cookies().delete(DEMO_ROLE_COOKIE);
+  revalidatePath("/", "layout");
   // If email confirmation is on, session is null until verified.
   if (!data.session) redirect("/verify-email");
   redirect("/onboarding");

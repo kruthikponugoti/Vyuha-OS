@@ -5,8 +5,11 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { switchDemoRole, signOut } from "@/lib/auth-actions";
+import { supabaseBrowser } from "@/lib/supabase-browser";
 import type { Role, User } from "@/lib/types";
 import { ROLES } from "@/lib/types";
 import { titleCase } from "@/lib/utils";
@@ -19,6 +22,18 @@ function initials(name: string) {
 
 export function UserMenu({ user, demo }: { user: User; demo: boolean }) {
   const [pending, start] = React.useTransition();
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [signingOut, setSigningOut] = React.useState(false);
+
+  async function doSignOut() {
+    setSigningOut(true);
+    // Full clear so the next login can never inherit this user's identity/role.
+    try { await supabaseBrowser?.auth.signOut(); } catch { /* no real session */ }
+    try { localStorage.clear(); sessionStorage.clear(); } catch { /* storage blocked */ }
+    try { await signOut(); } catch { /* server clears cookies + Supabase session */ }
+    // Hard navigation — resets the Next.js router cache and all React state.
+    window.location.assign("/login");
+  }
 
   return (
     <DropdownMenu>
@@ -51,7 +66,7 @@ export function UserMenu({ user, demo }: { user: User; demo: boolean }) {
                   disabled={pending}
                   onSelect={(e) => {
                     e.preventDefault();
-                    start(() => switchDemoRole(r as Role));
+                    start(async () => { await switchDemoRole(r as Role); });
                   }}
                   className="capitalize"
                 >
@@ -72,13 +87,26 @@ export function UserMenu({ user, demo }: { user: User; demo: boolean }) {
         <DropdownMenuItem
           onSelect={(e) => {
             e.preventDefault();
-            start(() => signOut());
+            setConfirmOpen(true);
           }}
           className="text-destructive focus:text-destructive"
         >
           <LogOut className="h-4 w-4" /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
+
+      <Dialog open={confirmOpen} onOpenChange={(o) => { if (!signingOut) setConfirmOpen(o); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Sign Out</DialogTitle>
+            <DialogDescription>Are you sure you want to sign out?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={signingOut}>Cancel</Button>
+            <Button variant="destructive" onClick={doSignOut} disabled={signingOut}>{signingOut ? "Signing out…" : "Sign Out"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DropdownMenu>
   );
 }

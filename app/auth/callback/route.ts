@@ -36,5 +36,6 @@ export async function GET(request: Request) {
   // Real sign-in wins over any lingering demo session.
   const res = NextResponse.redirect(`${origin}${dest}`);
   res.cookies.delete("vyuha-demo-auth");
+  res.cookies.delete("vyuha-demo-role");
   return res;
 }

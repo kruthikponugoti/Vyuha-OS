@@ -49,7 +49,15 @@ export const DEMO_ROLE_COOKIE = "vyuha-demo-role";
  */
 export function isDemoRequest(): boolean {
   try {
-    return Boolean(cookies().get(DEMO_AUTH_COOKIE));
+    const store = cookies();
+    // A real Supabase auth session ALWAYS wins over a lingering demo cookie.
+    // This prevents a stale/tampered demo cookie from overriding a logged-in
+    // user's real identity and role (security: no demo-bleed, no role switch).
+    const hasRealSession = store
+      .getAll()
+      .some((c) => /^sb-.+-auth-token(\.\d+)?$/.test(c.name) && Boolean(c.value));
+    if (hasRealSession) return false;
+    return Boolean(store.get(DEMO_AUTH_COOKIE));
   } catch {
     // Fall back to checking configuration if cookies() cannot be accessed (e.g. static generation)
     return !supabaseConfigured;
